@@ -1,0 +1,31 @@
+{
+  "name": "azurlane-plugin",
+  "version": "1.0.0",
+  "description": "基于 Yunzai 的碧蓝航线 Wiki 本地缓存查询插件",
+  "type": "module",
+  "main": "index.js",
+  "scripts": {
+    "build:ships": "node ./tools/build-ship-cache.js",
+    "build:ships:all": "python ./tools/build-all-ships.py",
+    "build:equip": "node ./tools/build-equip-cache.js",
+    "build:equip:html": "node ./tools/build-equip-from-html.js",
+    "build:equip:all": "python ./tools/build-all-equips.py",
+    "preview": "node ./tools/preview-ship-card.js",
+    "check": "node --check index.js && node --check apps/wiki.js && node --check components/render.js && node --check model/cache-store.js && node --check model/equip-parser.js && node --check model/equip-request.js && node --check model/equip-store.js && node --check model/ship-cache-builder.js && node --check model/ship-card-data.js && node --check model/ship-request.js && node --check model/ship-store.js && node --check model/wiki-parser.js && node --check tools/build-equip-cache.js && node --check tools/build-equip-from-html.js && node --check tools/build-ship-cache.js && node --check tools/preview-ship-card.js && python -m py_compile ./tools/build-all-equips.py && python -m py_compile ./tools/build-all-ships.py",
+    "test": "pnpm run check"
+  },
+  "keywords": [
+    "yunzai",
+    "azurlane",
+    "wiki",
+    "plugin"
+  ],
+  "author": "",
+  "license": "GPL-3.0-or-later",
+  "packageManager": "pnpm@10.20.0",
+  "dependencies": {
+    "art-template": "^4.13.4",
+    "cheerio": "^1.1.2",
+    "puppeteer": "^24.39.1"
+  }
+}
