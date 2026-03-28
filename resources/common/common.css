@@ -24,6 +24,12 @@ body {
     linear-gradient(135deg, var(--bg-1) 0%, var(--bg-2) 48%, var(--bg-3) 100%);
 }
 
+body[style*="transform:scale"] .page-shell {
+  width: fit-content;
+  margin-left: auto;
+  margin-right: auto;
+}
+
 .page-shell {
   padding: 28px;
 }
