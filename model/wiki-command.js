@@ -1,6 +1,8 @@
-export const WIKI_COMMAND_RULE = '^(?:(?:!|！)\\s*(?:碧蓝|碧蓝航线|blhx)?|(?:碧蓝|碧蓝航线|blhx))\\s*(.+?)(技能|天赋|资料|图鉴|属性|配装|配装推荐|推荐配装|装备)$'
+const TRAILING_PUNCTUATION = '[.。!！~～…]*'
 
-const WIKI_COMMAND_REG = /^(?:(?:!|！)\s*(?:碧蓝|碧蓝航线|blhx)?|(?:碧蓝|碧蓝航线|blhx))\s*(.+?)(技能|天赋|资料|图鉴|属性|配装|配装推荐|推荐配装|装备)$/i
+export const WIKI_COMMAND_RULE = `^(?:(?:!|！)\\s*(?:碧蓝|碧蓝航线|blhx)?|(?:碧蓝|碧蓝航线|blhx))\\s*(.+?)(技能|天赋|资料|图鉴|属性|配装|配装推荐|推荐配装|装备)${TRAILING_PUNCTUATION}$`
+
+const WIKI_COMMAND_REG = /^(?:(?:!|！)\s*(?:碧蓝|碧蓝航线|blhx)?|(?:碧蓝|碧蓝航线|blhx))\s*(.+?)(技能|天赋|资料|图鉴|属性|配装|配装推荐|推荐配装|装备)[.。!！~～…]*$/i
 
 export function parseWikiCommand(message) {
   const rawMessage = String(message ?? '').trim()

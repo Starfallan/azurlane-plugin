@@ -7,6 +7,11 @@ const PLUGIN_NAME = 'azurlane-plugin'
 import { buildShipCardViewModel } from '../model/ship-card-data.js'
 import { buildShipEquipCardViewModel } from '../model/ship-equip-card-data.js'
 
+const PLUGIN_ROOT = path.resolve(fileURLToPath(new URL('..', import.meta.url)))
+const RESOURCE_ROOT = path.join(PLUGIN_ROOT, 'resources')
+const RESOURCE_ROOT_URL = `${pathToFileURL(RESOURCE_ROOT).href.replace(/\/?$/, '/')}`
+const DEFAULT_LAYOUT_FILE = path.join(RESOURCE_ROOT, 'common', 'layout', 'default.html')
+
 const RENDER_TEMPLATE_VERSION = {
   ship: 'ship-card-v1',
   skill: 'ship-card-skill-v1',
@@ -220,7 +225,17 @@ async function renderByRuntime(e, rendererKey, data) {
   }
 
   try {
-    return await e.runtime.render(PLUGIN_NAME, rendererKey, data, { retType: 'default' })
+    return await e.runtime.render(PLUGIN_NAME, rendererKey, data, {
+      retType: 'default',
+      beforeRender({ data: runtimeData = {} }) {
+        return {
+          ...runtimeData,
+          ...data,
+          _res_path: RESOURCE_ROOT_URL,
+          defaultLayout: DEFAULT_LAYOUT_FILE
+        }
+      }
+    })
   } catch (error) {
     globalThis.logger?.warn?.(`[azurlane-plugin] runtime.render 失败，已回退 Renderer.render: ${rendererKey}`, error)
     return null

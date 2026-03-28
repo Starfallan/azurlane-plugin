@@ -12,12 +12,13 @@ import {
 import { WIKI_COMMAND_RULE, buildMissingDataMessage, buildRenderFailureMessage, parseWikiCommand } from '../model/wiki-command.js'
 
 const COMMAND_HEAD = '(?:(?:!|！)\\s*(?:碧蓝|碧蓝航线|blhx)?|(?:碧蓝|碧蓝航线|blhx))\\s*'
-const UPDATE_PLUGIN_RULE = `^${COMMAND_HEAD}插件更新$`
-const UPDATE_SHIP_DATA_RULE = `^${COMMAND_HEAD}更新(.+?)数据$`
+const COMMAND_TAIL = '[.。!！~～…]*$'
+const UPDATE_PLUGIN_RULE = `^${COMMAND_HEAD}插件更新${COMMAND_TAIL}`
+const UPDATE_SHIP_DATA_RULE = `^${COMMAND_HEAD}更新(.+?)数据${COMMAND_TAIL}`
 let initLogged = false
 
 function parseShipUpdateCommand(message) {
-  const match = String(message ?? '').trim().match(/^(?:(?:!|！)\s*(?:碧蓝|碧蓝航线|blhx)?|(?:碧蓝|碧蓝航线|blhx))\s*更新(.+?)数据$/i)
+  const match = String(message ?? '').trim().match(/^(?:(?:!|！)\s*(?:碧蓝|碧蓝航线|blhx)?|(?:碧蓝|碧蓝航线|blhx))\s*更新(.+?)数据[.。!！~～…]*$/i)
   if (!match) {
     return ''
   }
