@@ -69,7 +69,7 @@
 
     <aside class="hero-side">
       {{if portrait_image}}
-      <div class="portrait-card">
+      <div class="portrait-card"{{if portrait_style}} style="{{portrait_style}}"{{/if}}>
         {{if rarity_background}}
         <img class="portrait-bg" src="{{rarity_background}}" alt="{{rarity}}背景" />
         {{/if}}

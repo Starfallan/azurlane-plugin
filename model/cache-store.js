@@ -3,8 +3,10 @@ import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 
 const CHARACTER_ROOT = fileURLToPath(new URL('../resources/character', import.meta.url))
+const SHIP_ALIAS_FILE = fileURLToPath(new URL('../resources/ship_aliases_from_nicknames.json', import.meta.url))
 
 let cachePromise
+let aliasMapPromise
 
 export class CacheLookupError extends Error {
   constructor(message) {
@@ -104,6 +106,35 @@ export async function getShipCache() {
 
 export function invalidateShipCache() {
   cachePromise = undefined
+  aliasMapPromise = undefined
+}
+
+async function readAliasMapFromDisk() {
+  try {
+    const raw = await fs.readFile(SHIP_ALIAS_FILE, 'utf8')
+    const parsed = JSON.parse(raw)
+    const shipToAliases = parsed?.ship_to_aliases ?? {}
+    const aliasToShip = new Map()
+
+    for (const [shipName, aliases] of Object.entries(shipToAliases)) {
+      aliasToShip.set(normalizeKeyword(shipName), shipName)
+      for (const alias of Array.isArray(aliases) ? aliases : []) {
+        const normalizedAlias = normalizeKeyword(alias)
+        if (normalizedAlias) {
+          aliasToShip.set(normalizedAlias, shipName)
+        }
+      }
+    }
+
+    return aliasToShip
+  } catch {
+    return new Map()
+  }
+}
+
+async function getAliasMap() {
+  aliasMapPromise ??= readAliasMapFromDisk()
+  return aliasMapPromise
 }
 
 function scoreShip(ship, keyword) {
@@ -146,7 +177,8 @@ function formatAlternatives(resultList) {
 }
 
 export async function findShipFromCache(keyword) {
-  const query = normalizeKeyword(keyword)
+  const rawQuery = String(keyword ?? '').trim()
+  let query = normalizeKeyword(rawQuery)
   if (!query) {
     throw new CacheLookupError('请输入要查询的舰船名称。')
   }
@@ -160,6 +192,12 @@ export async function findShipFromCache(keyword) {
 
   if (!Array.isArray(cache?.ships) || cache.ships.length === 0) {
     throw new CacheLookupError('`resources/character` 下还没有舰船资料，请先执行 `pnpm run build:ships` 抓取数据。')
+  }
+
+  const aliasMap = await getAliasMap()
+  const mappedShipName = aliasMap.get(query)
+  if (mappedShipName) {
+    query = normalizeKeyword(mappedShipName)
   }
 
   const ranked = cache.ships

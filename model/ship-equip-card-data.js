@@ -100,6 +100,62 @@ function formatDateTime(value) {
   return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())} ${pad(date.getHours())}:${pad(date.getMinutes())}`
 }
 
+function parseReleaseYear(value) {
+  const text = String(value ?? '')
+  const match = text.match(/(20\d{2})/)
+  return match ? Number(match[1]) : 0
+}
+
+function clamp(value, min, max) {
+  return Math.min(max, Math.max(min, value))
+}
+
+function buildPortraitStyle(ship) {
+  const rarityScaleMap = {
+    '普通': 1.0,
+    '稀有': 1.02,
+    '精锐': 1.06,
+    '超稀有': 1.2,
+    '海上传奇': 1.26,
+    '决战方案': 1.2
+  }
+
+  const rarityFrameMap = {
+    '普通': 92,
+    '稀有': 93,
+    '精锐': 95,
+    '超稀有': 97,
+    '海上传奇': 98,
+    '决战方案': 99
+  }
+
+  const releaseYear = parseReleaseYear(ship.release_date)
+  let scale = rarityScaleMap[ship.rarity] ?? 1.05
+  let frame = rarityFrameMap[ship.rarity] ?? 95
+
+  if (releaseYear >= 2024) {
+    scale += 0.06
+    frame += 2
+  } else if (releaseYear >= 2021) {
+    scale += 0.03
+    frame += 1
+  } else if (releaseYear > 0 && releaseYear <= 2018) {
+    scale -= 0.03
+    frame -= 2
+  }
+
+  if (/(驱逐|轻巡|潜艇)/.test(ship.type || '')) {
+    scale -= 0.02
+  } else if (/(战列|战巡|航母|维修|重炮)/.test(ship.type || '')) {
+    scale += 0.01
+  }
+
+  scale = clamp(Number(scale.toFixed(2)), 0.98, 1.24)
+  frame = clamp(Math.round(frame), 90, 102)
+
+  return `--portrait-scale:${scale};--portrait-max-width:${frame}%;--portrait-max-height:${frame}%;`
+}
+
 function buildTagChips(ship, equip) {
   const chips = [
     ship.rarity || '未知稀有度',
@@ -267,6 +323,7 @@ export function buildShipEquipCardViewModel({ ship, equip, keyword = '', alterna
     cacheMeta,
     ship_name: shipName,
     portrait_image: resolvePreferredShipAssetSrc(ship.image, ship.wiki_image),
+    portrait_style: buildPortraitStyle(ship),
     rarity_background: ship.rarity ? resolveAsset(`resources/common/img/rarity/bg_${ship.rarity}.avif`) : '',
     camp_icon: ship.camp ? resolveAsset(`resources/common/img/camp/${ship.camp}.png`) : '',
     tag_chips: buildTagChips(ship, equip),

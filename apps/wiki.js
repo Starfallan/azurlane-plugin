@@ -10,17 +10,21 @@ import {
   updatePluginFromGit
 } from '../model/admin-service.js'
 import {
-  WIKI_COMMAND_PREFIX_RULE,
   buildMissingDataMessage,
   buildRenderFailureMessage,
   parseWikiCommand
 } from '../model/wiki-command.js'
 
+const MATCH_ALL_RULE = '^.*$'
 const COMMAND_HEAD = '(?:(?:!|！)\\s*(?:碧蓝|碧蓝航线|blhx)?|(?:碧蓝|碧蓝航线|blhx))\\s*'
 const COMMAND_TAIL = '[.。!！~～…]*$'
-const UPDATE_PLUGIN_RULE = `^${COMMAND_HEAD}插件更新${COMMAND_TAIL}`
-const UPDATE_SHIP_DATA_RULE = `^${COMMAND_HEAD}更新(.+?)数据${COMMAND_TAIL}`
+const UPDATE_PLUGIN_RULE = new RegExp(`^${COMMAND_HEAD}插件更新${COMMAND_TAIL}`, 'i')
+const UPDATE_SHIP_DATA_RULE = new RegExp(`^${COMMAND_HEAD}更新(.+?)数据${COMMAND_TAIL}`, 'i')
 let initLogged = false
+
+function isUpdatePluginCommand(message) {
+  return UPDATE_PLUGIN_RULE.test(String(message ?? '').trim())
+}
 
 function parseShipUpdateCommand(message) {
   const match = String(message ?? '').trim().match(/^(?:(?:!|！)\s*(?:碧蓝|碧蓝航线|blhx)?|(?:碧蓝|碧蓝航线|blhx))\s*更新(.+?)数据[.。!！~～…]*$/i)
@@ -40,16 +44,8 @@ export class AzurLaneWiki extends plugin {
       priority: 5000,
       rule: [
         {
-          reg: WIKI_COMMAND_PREFIX_RULE,
-          fnc: 'dispatchWikiCommand'
-        },
-        {
-          reg: UPDATE_PLUGIN_RULE,
-          fnc: 'updatePlugin'
-        },
-        {
-          reg: UPDATE_SHIP_DATA_RULE,
-          fnc: 'updateShipData'
+          reg: MATCH_ALL_RULE,
+          fnc: 'dispatchMessage'
         }
       ]
     })
@@ -71,13 +67,30 @@ export class AzurLaneWiki extends plugin {
     return false
   }
 
-  async dispatchWikiCommand(e) {
+  async dispatchMessage(e) {
     e.original_msg = e.original_msg || e.msg
-    const parsed = parseWikiCommand(e.original_msg)
+    const message = String(e.original_msg ?? '').trim()
+    if (!message) {
+      return false
+    }
+
+    if (isUpdatePluginCommand(message)) {
+      return this.updatePlugin(e)
+    }
+
+    if (parseShipUpdateCommand(message)) {
+      return this.updateShipData(e)
+    }
+
+    const parsed = parseWikiCommand(message)
     if (!parsed) {
       return false
     }
 
+    return this.dispatchWikiCommand(e, parsed)
+  }
+
+  async dispatchWikiCommand(e, parsed) {
     e.azurlaneWiki = parsed
 
     try {

@@ -15,10 +15,10 @@ const DEFAULT_LAYOUT_FILE = path.join(RESOURCE_ROOT, 'common', 'layout', 'defaul
 const RENDER_TEMPLATE_VERSION = {
   ship: 'ship-card-v1',
   skill: 'ship-card-skill-v1',
-  equip: 'ship-equip-card-v2'
+  equip: 'ship-equip-card-v4'
 }
 
-const IMAGE_CACHE_ROOT = path.resolve('temp', 'render-cache')
+const IMAGE_CACHE_ROOT = path.join(PLUGIN_ROOT, 'temp', 'render-cache')
 const IMAGE_CACHE_TTL_MS = 7 * 24 * 60 * 60 * 1000
 const fallbackRenderCache = new Map()
 let cacheCleanupPromise
@@ -116,6 +116,10 @@ async function persistRenderedImage(saveId, image) {
 
   if (image && typeof image === 'object' && typeof image.file === 'string') {
     return persistRenderedImage(saveId, image.file)
+  }
+
+  if (image && typeof image === 'object' && image.data && typeof image.data.file === 'string') {
+    return persistRenderedImage(saveId, image.data.file)
   }
 
   if (typeof image !== 'string') {
@@ -218,7 +222,7 @@ function createShipEquipRenderData({ ship, equip, keyword, alternatives, cacheMe
     defaultLayout: `./plugins/${PLUGIN_NAME}/resources/common/layout/default.html`,
     _res_path: `./plugins/${PLUGIN_NAME}/resources/`,
     sys: {
-      scale: buildScaleStyle(0.78),
+      scale: buildScaleStyle(1),
       copyright: `AzurLane Wiki Cache · ${view.generated_at_display || cacheMeta?.generatedAt || 'local'}`
     }
   }
