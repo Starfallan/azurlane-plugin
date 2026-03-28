@@ -4,6 +4,23 @@ import fs from 'node:fs'
 
 const PLUGIN_ROOT = path.resolve(fileURLToPath(new URL('..', import.meta.url)))
 
+function hasResolvableAsset(assetPath) {
+  if (!assetPath) {
+    return false
+  }
+
+  const value = String(assetPath).trim()
+  if (!value) {
+    return false
+  }
+
+  if (/^(https?:|file:)/i.test(value)) {
+    return true
+  }
+
+  return fs.existsSync(path.resolve(PLUGIN_ROOT, value))
+}
+
 function getMimeType(filePath) {
   const ext = path.extname(filePath).toLowerCase()
   switch (ext) {
@@ -48,6 +65,18 @@ export function resolveShipAssetSrc(assetPath) {
   }
 }
 
+export function resolvePreferredShipAssetSrc(primaryAssetPath, fallbackAssetPath = '') {
+  if (hasResolvableAsset(primaryAssetPath)) {
+    return resolveShipAssetSrc(primaryAssetPath)
+  }
+
+  if (fallbackAssetPath && hasResolvableAsset(fallbackAssetPath)) {
+    return resolveShipAssetSrc(fallbackAssetPath)
+  }
+
+  return ''
+}
+
 function modeLabel(mode) {
   return mode === 'skill' ? '技能档案' : '舰船资料'
 }
@@ -84,6 +113,20 @@ function buildMetaChips(ship) {
   return chips
 }
 
+function resolveRarityBackground(rarity) {
+  if (!rarity) {
+    return ''
+  }
+  return resolveShipAssetSrc(`resources/common/img/rarity/bg_${rarity}.avif`)
+}
+
+function resolveCampIcon(camp) {
+  if (!camp) {
+    return ''
+  }
+  return resolveShipAssetSrc(`resources/common/img/camp/${camp}.png`)
+}
+
 export function buildShipCardViewModel({ ship, mode = 'ship', keyword = '', alternatives = [], cacheMeta = {} }) {
   const normalSkills = normalizeSkillList(ship.skills_normal || ship.skills || [])
   const retrofitSkills = normalizeSkillList(ship.skills_retrofit || [])
@@ -96,10 +139,15 @@ export function buildShipCardViewModel({ ship, mode = 'ship', keyword = '', alte
     mode,
     modeLabel: modeLabel(mode),
     title: `${ship.name} · ${modeLabel(mode)}`,
-    portrait_image: resolveShipAssetSrc(ship.image || ship.wiki_image),
+    portrait_image: resolvePreferredShipAssetSrc(ship.image, ship.wiki_image),
     wiki_image_src: resolveShipAssetSrc(ship.wiki_image),
+    rarity_background: resolveRarityBackground(ship.rarity),
+    camp_icon: resolveCampIcon(ship.camp),
     profile_rows: buildProfileRows(ship),
     meta_chips: buildMetaChips(ship),
+    skills: normalSkills,
+    skills_normal: normalSkills,
+    skills_retrofit: retrofitSkills,
     normal_skills: normalSkills,
     retrofit_skills: retrofitSkills,
     has_retrofit_skills: retrofitSkills.length > 0,

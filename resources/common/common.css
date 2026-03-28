@@ -29,13 +29,13 @@ body {
 }
 
 .container {
-  width: 1360px;
+  width: 800px;
   margin: 0 auto;
 }
 
 .copyright {
   margin-top: 16px;
-  text-align: right;
+  text-align: center;
   color: rgba(255, 255, 255, 0.48);
   font-size: 18px;
   letter-spacing: 0.08em;

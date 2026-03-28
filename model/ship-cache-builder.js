@@ -1,11 +1,12 @@
 import { parseShipPage } from './wiki-parser.js'
-import { normalizeKeyword } from './cache-store.js'
+import { invalidateShipCache, normalizeKeyword } from './cache-store.js'
 import { fetchShipText } from './ship-request.js'
 import {
   ensureCharacterDirs,
   getExpectedShipLocalImagePath,
   loadShipBuildState,
   loadShipInstallDict,
+  readShipData,
   shipDataExists,
   writeShipBuildState,
   writeShipData
@@ -66,14 +67,15 @@ function sleep(ms) {
 
 function transformShipData(parsed, entry) {
   const wikiImage = parsed.image || ''
-  const localImage = getExpectedShipLocalImagePath(entry.original_name, entry.matched_internal_name)
+  const shipName = parsed.pageTitle || entry.original_name || parsed.name || ''
+  const localImage = getExpectedShipLocalImagePath(shipName, entry.matched_internal_name)
 
   return {
     ...parsed,
-    id: entry.ship_id,
-    ship_id: entry.ship_id,
-    name: entry.original_name,
-    original_name: entry.original_name,
+    id: entry.ship_id || parsed.id || shipName,
+    ship_id: entry.ship_id || '',
+    name: shipName,
+    original_name: shipName,
     alias_name: entry.alias_name || '',
     matched_internal_name: entry.matched_internal_name || '',
     release_date: entry.release_date || '',
@@ -81,8 +83,8 @@ function transformShipData(parsed, entry) {
     wiki_image: wikiImage,
     searchKeywords: buildSearchKeywords({
       ...parsed,
-      name: entry.original_name,
-      original_name: entry.original_name,
+      name: shipName,
+      original_name: shipName,
       matched_internal_name: entry.matched_internal_name,
       alias_name: entry.alias_name
     }),
@@ -98,6 +100,69 @@ async function buildSingleShip(entry, options = {}) {
   const { data: html } = await fetchShipText(pageUrl, { retries, retryDelayMs })
   const parsed = parseShipPage(html, { pageUrl })
   return transformShipData(parsed, entry)
+}
+
+function buildFallbackShipEntry(shipName, existingShip = null) {
+  return {
+    ship_id: existingShip?.ship_id || existingShip?.id || '',
+    original_name: existingShip?.original_name || existingShip?.name || shipName,
+    alias_name: existingShip?.alias_name || '',
+    matched_internal_name: existingShip?.matched_internal_name || '',
+    release_date: existingShip?.release_date || ''
+  }
+}
+
+function matchShipEntry(entries, keyword) {
+  const normalized = normalizeKeyword(keyword)
+  return entries.find((entry) => {
+    return normalized === normalizeKeyword(entry.original_name)
+      || normalized === normalizeKeyword(entry.ship_id)
+      || normalized === normalizeKeyword(entry.matched_internal_name)
+      || normalized === normalizeKeyword(entry.alias_name)
+  }) ?? null
+}
+
+export async function resolveShipBuildEntry(shipName) {
+  const normalizedName = String(shipName ?? '').trim()
+  const entries = normalizeShipEntries(await loadShipInstallDict())
+  const matchedEntry = matchShipEntry(entries, normalizedName)
+  if (matchedEntry) {
+    return matchedEntry
+  }
+
+  try {
+    const existingShip = await readShipData(normalizedName)
+    return buildFallbackShipEntry(normalizedName, existingShip)
+  } catch {
+    return buildFallbackShipEntry(normalizedName)
+  }
+}
+
+export async function buildShipDataByName(shipName, options = {}) {
+  const { retries = 4, retryDelayMs = 2500 } = options
+  await ensureCharacterDirs()
+
+  const entry = await resolveShipBuildEntry(shipName)
+  const ship = await buildSingleShip(entry, { retries, retryDelayMs })
+  const filePath = await writeShipData(ship.original_name, ship)
+
+  const state = await loadShipBuildState()
+  const completedSet = new Set(state.completed ?? [])
+  completedSet.add(ship.original_name)
+  if (entry.original_name && entry.original_name !== ship.original_name) {
+    completedSet.add(entry.original_name)
+    delete state.failed?.[entry.original_name]
+  }
+  delete state.failed?.[ship.original_name]
+  state.completed = Array.from(completedSet)
+  await writeShipBuildState(state)
+  invalidateShipCache()
+
+  return {
+    ship,
+    entry,
+    filePath
+  }
 }
 
 export async function buildShipCache(options = {}) {
@@ -132,14 +197,16 @@ export async function buildShipCache(options = {}) {
     const entry = pending[index]
     try {
       const ship = await buildSingleShip(entry, { retries, retryDelayMs })
-      await writeShipData(entry.original_name, ship)
+      await writeShipData(ship.original_name, ship)
+      invalidateShipCache()
 
       finished += 1
-      completedSet.add(entry.original_name)
+      completedSet.add(ship.original_name)
       delete state.failed?.[entry.original_name]
+      delete state.failed?.[ship.original_name]
       state.completed = Array.from(completedSet)
       await writeShipBuildState(state)
-      console.info(`[build:ships] 完成 ${finished}/${pending.length}: ${entry.original_name}`)
+      console.info(`[build:ships] 完成 ${finished}/${pending.length}: ${ship.original_name}`)
     } catch (error) {
       failed += 1
       state.failed ??= {}

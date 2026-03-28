@@ -102,6 +102,10 @@ export async function getShipCache() {
   return cachePromise
 }
 
+export function invalidateShipCache() {
+  cachePromise = undefined
+}
+
 function scoreShip(ship, keyword) {
   let best = 0
 

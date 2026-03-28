@@ -2,224 +2,278 @@
 
 {{block 'css'}}
 <link rel="stylesheet" type="text/css" href="{{_res_path}}wiki/ship-card.css" />
+<style>
+  @font-face {
+    font-family: 'MiSans';
+    src: url('{{_res_path}}common/fonts/MiSans-Regular.woff2') format('woff2');
+    font-weight: 400;
+    font-style: normal;
+    font-display: swap;
+  }
+
+  .ship-card,
+  .ship-card * {
+    font-family: 'MiSans', 'HarmonyOS Sans SC', 'PingFang SC', 'Microsoft YaHei', sans-serif;
+  }
+</style>
 {{/block}}
 
 {{block 'main'}}
-<div class="ship-dashboard mode-{{mode}}">
-  <section class="top-grid">
-    <article class="cut-panel intro-panel">
-      <div class="intro-head">
-        <div class="hud-kicker">角色详情 <span>SHIP INFO</span></div>
-        <h1 class="hud-title">{{name}}</h1>
-        <div class="hud-subtitle">{{code}}</div>
-        <div class="hud-chip-row">
-          {{each meta_chips chip}}
-          <span class="hud-chip">{{chip}}</span>
+<div class="ship-card rarity-{{rarity}}">
+  <!-- 顶部主区域：左侧信息+属性 / 右侧立绘 -->
+  <div class="top-grid">
+    <!-- 左列：基础信息 + 属性面板 -->
+    <div class="left-column">
+      <!-- 基础信息区 -->
+      <div class="header-block">
+        <div class="id-badge">
+          <span class="id-num">#{{id}}</span>
+          <span class="id-label">SHIP DATA</span>
+        </div>
+        <h1 class="ship-name">{{name}}</h1>
+        {{if code || camp_icon}}
+        <div class="ship-subline">
+          {{if code}}<div class="ship-code">{{code}}</div>{{/if}}
+          {{if camp_icon}}
+          <div class="camp-chip">
+            <img class="camp-icon" src="{{camp_icon}}" alt="{{camp}}" />
+          </div>
+          {{/if}}
+        </div>
+        {{/if}}
+        
+        <!-- 标签 -->
+        <div class="tag-row">
+          <span class="tag tag-rarity">{{rarity}}</span>
+          <span class="tag tag-type">{{type}}</span>
+          <span class="tag tag-camp">{{camp}}</span>
+          {{if canUpgrade}}<span class="tag tag-retrofit">可改造</span>{{/if}}
+        </div>
+
+        <!-- 基础信息 -->
+        <div class="basic-info">
+          {{if time}}
+          <div class="info-row">
+            <span class="info-label">建造时间</span>
+            <span class="info-value">{{time}}</span>
+          </div>
+          {{/if}}
+          {{if release_date}}
+          <div class="info-row">
+            <span class="info-label">发布日期</span>
+            <span class="info-value">{{release_date}}</span>
+          </div>
+          {{/if}}
+          {{if cv}}
+          <div class="info-row info-full">
+            <span class="info-label">声优</span>
+            <span class="info-value">{{cv}}</span>
+          </div>
+          {{/if}}
+        </div>
+      </div>
+
+      <!-- 属性面板 -->
+      <div class="panel">
+        <div class="panel-header">
+          <span class="panel-icon"></span>
+          <span class="panel-title">属性面板</span>
+          <span class="panel-sub">ATTRIBUTES</span>
+          <span class="panel-line"></span>
+        </div>
+        <div class="stats-grid">
+          {{each stats item}}
+          <div class="stat-cell">
+            <span class="stat-label">{{item.label}}</span>
+            <span class="stat-value">{{item.value}}</span>
+          </div>
           {{/each}}
         </div>
       </div>
-      <div class="profile-list">
-        {{each profile_rows row}}
-        <div class="profile-row">
-          <div class="profile-label">
-            <span class="label-cn">{{row.label}}</span>
-            <span class="label-en">{{row.en}}</span>
-          </div>
-          <div class="profile-value">{{row.value}}</div>
-        </div>
-        {{/each}}
-      </div>
-    </article>
+    </div>
 
-    <div class="portrait-stage">
-      <div class="portrait-orbit"></div>
-      <div class="portrait-glass"></div>
+    <!-- 右列：立绘 -->
+    <div class="right-column">
       {{if portrait_image}}
-      <img class="portrait-image" src="{{portrait_image}}" alt="{{name}}">
-      {{else}}
-      <div class="portrait-empty">NO DATA</div>
-      {{/if}}
-    </div>
-
-    <div class="right-stack">
-      <article class="cut-panel stat-panel {{if mode === 'skill'}}is-focus{{/if}}">
-        <div class="panel-head">
-          <span class="panel-cn">属性面板</span>
-          <span class="panel-en">ATTRIBUTE MATRIX</span>
-        </div>
-        <div class="stat-list">
-          {{each stats stat}}
-          <div class="stat-row">
-            <div class="stat-tag">{{stat.label}}</div>
-            <div class="stat-number">{{stat.value}}</div>
-          </div>
-          {{/each}}
-        </div>
-      </article>
-
-      {{if has_fleet_tech}}
-      <article class="cut-panel tech-panel">
-        <div class="panel-head">
-          <span class="panel-cn">舰队科技</span>
-          <span class="panel-en">FLEET TECH</span>
-        </div>
-        <div class="tech-total">TOTAL {{fleetTech.total}}</div>
-        <div class="tech-table">
-          {{each fleet_tech_rows row}}
-          <div class="tech-row">
-            <span class="tech-stage">{{row.stage}}</span>
-            <span class="tech-points">{{row.points}}</span>
-            <span class="tech-bonus">{{row.bonus}}</span>
-          </div>
-          {{/each}}
-        </div>
-      </article>
-      {{/if}}
-    </div>
-  </section>
-
-  <section class="combat-grid">
-    <article class="cut-panel skill-panel {{if mode === 'skill'}}is-focus{{/if}}">
-      <div class="panel-head">
-        <span class="panel-cn">技能模块</span>
-        <span class="panel-en">SKILL MODULES</span>
-      </div>
-      <div class="skill-columns {{if has_retrofit_skills}}has-dual{{/if}}">
-        <div class="skill-block">
-          <div class="block-head">
-            <span>原始技能</span>
-            <small>NORMAL</small>
-          </div>
-          <div class="skill-stack">
-            {{each normal_skills skill}}
-            <div class="skill-card">
-              <div class="skill-icon">
-                {{if skill.icon_src}}
-                <img src="{{skill.icon_src}}" alt="{{skill.name}}">
-                {{else}}
-                <span>SKILL</span>
-                {{/if}}
-              </div>
-              <div class="skill-body">
-                <div class="skill-name">{{skill.name}}</div>
-                <div class="skill-detail">{{skill.detail}}</div>
-              </div>
-            </div>
-            {{/each}}
-          </div>
-        </div>
-
-        {{if has_retrofit_skills}}
-        <div class="skill-block retrofit-skill-block">
-          <div class="block-head">
-            <span>改造技能</span>
-            <small>RETROFIT</small>
-          </div>
-          <div class="skill-stack">
-            {{each retrofit_skills skill}}
-            <div class="skill-card retrofit-card">
-              <div class="skill-icon">
-                {{if skill.icon_src}}
-                <img src="{{skill.icon_src}}" alt="{{skill.name}}">
-                {{else}}
-                <span>SKILL</span>
-                {{/if}}
-              </div>
-              <div class="skill-body">
-                <div class="skill-name">{{skill.name}}</div>
-                <div class="skill-detail">{{skill.detail}}</div>
-              </div>
-            </div>
-            {{/each}}
-          </div>
-        </div>
+      <div class="portrait-container">
+        {{if rarity_background}}
+        <img class="portrait-bg" src="{{rarity_background}}" alt="{{rarity}}背景" />
         {{/if}}
+        <img class="portrait-img" src="{{portrait_image}}" alt="{{name}}" />
+        <div class="portrait-overlay"></div>
+        <div class="portrait-frame"></div>
       </div>
-    </article>
-
-    <div class="side-stack">
-      <article class="cut-panel equip-panel">
-        <div class="panel-head">
-          <span class="panel-cn">装备槽位</span>
-          <span class="panel-en">EQUIPMENT</span>
-        </div>
-        <div class="equip-table">
-          <div class="equip-row equip-head">
-            <span>槽位</span>
-            <span>装备类型</span>
-            <span>效率</span>
-            <span>武器数</span>
-            <span>预装填</span>
-          </div>
-          {{each equipments equip}}
-          <div class="equip-row">
-            <span>{{equip.slot}}</span>
-            <span>{{equip.name}}</span>
-            <span>{{equip.efficiency}}</span>
-            <span>{{equip.count}}</span>
-            <span>{{equip.prefill}}</span>
-          </div>
-          {{/each}}
-        </div>
-      </article>
-
-      {{if retrofit && retrofit.hasData}}
-      <article class="cut-panel retrofit-panel">
-        <div class="panel-head">
-          <span class="panel-cn">改造计划</span>
-          <span class="panel-en">RETROFIT PLAN</span>
-        </div>
-        <div class="retrofit-total">{{retrofit_total}}</div>
-        <div class="retrofit-table">
-          <div class="retrofit-row retrofit-head">
-            <span>项目</span>
-            <span>属性</span>
-            <span>图纸</span>
-            <span>物资</span>
-            <span>等级</span>
-            <span>星级</span>
-          </div>
-          {{each retrofit_rows row}}
-          <div class="retrofit-row">
-            <span>{{row.project}}</span>
-            <span>{{row.attribute}}</span>
-            <span>{{row.blueprints}}</span>
-            <span>{{row.materials}}</span>
-            <span>{{row.level}}</span>
-            <span>{{row.stars}}</span>
-          </div>
-          {{/each}}
-        </div>
-      </article>
       {{/if}}
     </div>
-  </section>
+  </div>
 
-  <section class="source-grid">
-    <article class="cut-panel source-panel">
-      <div class="panel-head">
-        <span class="panel-cn">获取途径</span>
-        <span class="panel-en">SOURCE</span>
+  <!-- 中间双列：装备槽位 + 舰队科技 -->
+  <div class="mid-grid">
+    <!-- 装备槽位 -->
+    <div class="panel">
+      <div class="panel-header">
+        <span class="panel-icon"></span>
+        <span class="panel-title">装备槽位</span>
+        <span class="panel-sub">EQUIPMENT</span>
+        <span class="panel-line"></span>
       </div>
-      <div class="source-stack">
-        {{each source_cards source}}
-        <div class="source-row">
-          <div class="source-title">{{source.label}}</div>
-          <div class="source-content">{{source.value}}</div>
+      <div class="equip-list">
+        {{each equipments item}}
+        <div class="equip-cell">
+          <span class="equip-num">{{item.slot}}</span>
+          <div class="equip-detail">
+            <span class="equip-name">{{item.name}}</span>
+            <span class="equip-stats">效率 {{item.efficiency}} · {{item.count}}座{{if item.prefill}} · 预装{{item.prefill}}{{/if}}</span>
+          </div>
         </div>
         {{/each}}
-        {{if has_alternatives}}
-        <div class="source-row alt-row">
-          <div class="source-title">相近结果</div>
-          <div class="alt-list">
-            {{each alternatives item}}
-            <span class="alt-chip">{{item}}</span>
-            {{/each}}
+      </div>
+    </div>
+
+    <!-- 舰队科技 -->
+    {{if fleetTech && fleetTech.hasData}}
+    <div class="panel">
+      <div class="panel-header">
+        <span class="panel-icon"></span>
+        <span class="panel-title">舰队科技</span>
+        <span class="panel-sub">FLEET TECH</span>
+        <span class="panel-badge">+{{fleetTech.total}}</span>
+        <span class="panel-line"></span>
+      </div>
+      <div class="tech-list">
+        {{each fleetTech.rows item}}
+        <div class="tech-cell">
+          <span class="tech-stage">{{item.stage}}</span>
+          <span class="tech-pts">{{item.points}}</span>
+          <span class="tech-bonus">{{item.bonus}}</span>
+        </div>
+        {{/each}}
+      </div>
+    </div>
+    {{else}}
+    <div class="panel panel-empty">
+      <div class="panel-header">
+        <span class="panel-icon"></span>
+        <span class="panel-title">舰队科技</span>
+        <span class="panel-sub">FLEET TECH</span>
+        <span class="panel-line"></span>
+      </div>
+      <div class="empty-text">暂无舰队科技数据</div>
+    </div>
+    {{/if}}
+  </div>
+
+  <!-- 内容区：技能等全宽内容 -->
+  <div class="content-area">
+    <!-- 技能 -->
+    <section class="panel">
+      <div class="panel-header">
+        <span class="panel-icon"></span>
+        <span class="panel-title">技能</span>
+        <span class="panel-sub">SKILLS</span>
+        <span class="panel-line"></span>
+      </div>
+      <div class="skill-list">
+        {{each normal_skills item}}
+        <div class="skill-item">
+          {{if item.icon_src}}
+          <img class="skill-icon" src="{{item.icon_src}}" alt="{{item.name}}" />
+          {{else}}
+          <div class="skill-icon skill-placeholder"></div>
+          {{/if}}
+          <div class="skill-content">
+            <span class="skill-name">{{item.name}}</span>
+            <p class="skill-desc">{{item.detail}}</p>
           </div>
         </div>
-        {{/if}}
+        {{/each}}
       </div>
-    </article>
-  </section>
+    </section>
+
+    <!-- 改造技能 -->
+    {{if skills_retrofit && skills_retrofit.length}}
+    <section class="panel panel-gold">
+      <div class="panel-header">
+        <span class="panel-icon icon-gold"></span>
+        <span class="panel-title">改造技能</span>
+        <span class="panel-sub">RETROFIT SKILLS</span>
+        <span class="panel-line line-gold"></span>
+      </div>
+      <div class="skill-list">
+        {{each skills_retrofit item}}
+        <div class="skill-item skill-gold">
+          {{if item.icon_src}}
+          <img class="skill-icon" src="{{item.icon_src}}" alt="{{item.name}}" />
+          {{else}}
+          <div class="skill-icon skill-placeholder"></div>
+          {{/if}}
+          <div class="skill-content">
+            <span class="skill-name">{{item.name}}</span>
+            <p class="skill-desc">{{item.detail}}</p>
+          </div>
+        </div>
+        {{/each}}
+      </div>
+    </section>
+    {{/if}}
+
+    <!-- 获取途径 -->
+    {{if sources && sources.length}}
+    <section class="panel">
+      <div class="panel-header">
+        <span class="panel-icon"></span>
+        <span class="panel-title">获取途径</span>
+        <span class="panel-sub">ACQUISITION</span>
+        <span class="panel-line"></span>
+      </div>
+      <div class="source-list">
+        {{each sources item}}
+        <div class="source-item">
+          <span class="source-label">{{item.label}}</span>
+          <div class="source-value">{{item.value}}</div>
+        </div>
+        {{/each}}
+      </div>
+    </section>
+    {{/if}}
+
+    <!-- 改造计划 -->
+    {{if retrofit && retrofit.hasData}}
+    <section class="panel panel-gold">
+      <div class="panel-header">
+        <span class="panel-icon icon-gold"></span>
+        <span class="panel-title">改造计划</span>
+        <span class="panel-sub">RETROFIT</span>
+        <span class="panel-line line-gold"></span>
+      </div>
+      <div class="retrofit-total">{{retrofit.total}}</div>
+      <div class="retrofit-list">
+        {{each retrofit.rows item}}
+        <div class="retrofit-row">
+          <div class="retrofit-info">
+            <span class="retrofit-name">{{item.project}}</span>
+            <span class="retrofit-attr">{{item.attribute}}</span>
+          </div>
+          <div class="retrofit-cost">
+            <span>{{item.blueprints}}</span>
+            <span class="retrofit-mat">{{item.materials}}</span>
+          </div>
+          <div class="retrofit-req">
+            <span>Lv.{{item.level}}</span>
+            <span class="retrofit-star">{{item.stars}}</span>
+          </div>
+        </div>
+        {{/each}}
+      </div>
+    </section>
+    {{/if}}
+
+    <!-- 底部 -->
+    <footer class="card-footer">
+      <span class="footer-line"></span>
+      <span class="footer-text">AZUR LANE · 碧蓝航线</span>
+      <span class="footer-line"></span>
+    </footer>
+  </div>
 </div>
 {{/block}}
