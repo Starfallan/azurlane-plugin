@@ -44,7 +44,7 @@ async function buildPreviewHtml(view) {
     defaultLayout,
     _res_path: '../../resources/',
     sys: {
-      scale: 'data-scale="1.15"',
+      scale: 'style="transform:scale(1);transform-origin:0 0;"',
       copyright: `AzurLane Wiki Cache · ${view.cacheMeta?.generatedAt ?? 'local preview'}`
     }
   })

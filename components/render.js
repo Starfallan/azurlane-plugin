@@ -15,13 +15,18 @@ const DEFAULT_LAYOUT_FILE = path.join(RESOURCE_ROOT, 'common', 'layout', 'defaul
 const RENDER_TEMPLATE_VERSION = {
   ship: 'ship-card-v1',
   skill: 'ship-card-skill-v1',
-  equip: 'ship-equip-card-v1'
+  equip: 'ship-equip-card-v2'
 }
 
 const IMAGE_CACHE_ROOT = path.resolve('temp', 'render-cache')
 const IMAGE_CACHE_TTL_MS = 7 * 24 * 60 * 60 * 1000
 const fallbackRenderCache = new Map()
 let cacheCleanupPromise
+
+function buildScaleStyle(scale = 1) {
+  const safeScale = Number.isFinite(scale) && scale > 0 ? scale : 1
+  return `style="transform:scale(${safeScale});transform-origin:0 0;"`
+}
 
 function normalizeSaveIdPart(value) {
   return String(value ?? '')
@@ -190,7 +195,7 @@ function createShipCardRenderData({ ship, mode, keyword, alternatives, cacheMeta
     defaultLayout: `./plugins/${PLUGIN_NAME}/resources/common/layout/default.html`,
     _res_path: `./plugins/${PLUGIN_NAME}/resources/`,
     sys: {
-      scale: 'data-scale="1.15"',
+      scale: buildScaleStyle(1),
       copyright: `AzurLane Wiki Cache · ${cacheMeta?.generatedAt ?? 'local'}`
     }
   }
@@ -213,7 +218,7 @@ function createShipEquipRenderData({ ship, equip, keyword, alternatives, cacheMe
     defaultLayout: `./plugins/${PLUGIN_NAME}/resources/common/layout/default.html`,
     _res_path: `./plugins/${PLUGIN_NAME}/resources/`,
     sys: {
-      scale: 'data-scale="1.0"',
+      scale: buildScaleStyle(0.78),
       copyright: `AzurLane Wiki Cache · ${view.generated_at_display || cacheMeta?.generatedAt || 'local'}`
     }
   }
@@ -263,6 +268,17 @@ async function renderByTemplate(e, rendererKey, data) {
     return wrapRenderedImage(fallbackRenderCache.get(data.saveId))
   }
 
+  const runtimeRendered = await renderByRuntime(e, rendererKey, data)
+  if (runtimeRendered !== null && runtimeRendered !== false) {
+    const cachedFile = await persistRenderedImage(data.saveId, runtimeRendered)
+    if (cachedFile) {
+      return wrapRenderedImage(pathToFileURL(cachedFile).href)
+    }
+
+    rememberFallbackRender(data.saveId, runtimeRendered)
+    return wrapRenderedImage(runtimeRendered)
+  }
+
   const rendered = await renderByRenderer(rendererKey, data)
   if (rendered !== null && rendered !== false) {
     const cachedFile = await persistRenderedImage(data.saveId, rendered)
@@ -272,16 +288,6 @@ async function renderByTemplate(e, rendererKey, data) {
 
     rememberFallbackRender(data.saveId, rendered)
     return wrapRenderedImage(rendered)
-  }
-
-  const runtimeRendered = await renderByRuntime(e, rendererKey, data)
-  if (runtimeRendered !== null && runtimeRendered !== false) {
-    const cachedFile = await persistRenderedImage(data.saveId, runtimeRendered)
-    if (cachedFile) {
-      return wrapRenderedImage(pathToFileURL(cachedFile).href)
-    }
-
-    return runtimeRendered
   }
 
   globalThis.logger?.error?.('[azurlane-plugin] 未找到可用的 Renderer 渲染器')

@@ -9,7 +9,12 @@ import {
   refreshShipBundleByName,
   updatePluginFromGit
 } from '../model/admin-service.js'
-import { WIKI_COMMAND_RULE, buildMissingDataMessage, buildRenderFailureMessage, parseWikiCommand } from '../model/wiki-command.js'
+import {
+  WIKI_COMMAND_PREFIX_RULE,
+  buildMissingDataMessage,
+  buildRenderFailureMessage,
+  parseWikiCommand
+} from '../model/wiki-command.js'
 
 const COMMAND_HEAD = '(?:(?:!|！)\\s*(?:碧蓝|碧蓝航线|blhx)?|(?:碧蓝|碧蓝航线|blhx))\\s*'
 const COMMAND_TAIL = '[.。!！~～…]*$'
@@ -35,7 +40,7 @@ export class AzurLaneWiki extends plugin {
       priority: 5000,
       rule: [
         {
-          reg: WIKI_COMMAND_RULE,
+          reg: WIKI_COMMAND_PREFIX_RULE,
           fnc: 'dispatchWikiCommand'
         },
         {
@@ -63,8 +68,6 @@ export class AzurLaneWiki extends plugin {
     if (e?.isMaster) {
       return true
     }
-
-    await e.reply('只有主人才能使用这个命令。')
     return false
   }
 
@@ -84,26 +87,21 @@ export class AzurLaneWiki extends plugin {
         : await this.renderWikiCard(e, { ship, mode: parsed.mode, keyword: parsed.keyword, alternatives, cacheMeta })
 
       if (!image) {
-        await e.reply(buildRenderFailureMessage(parsed.mode))
-        return true
+        return buildRenderFailureMessage(parsed.mode)
       }
 
-      await e.reply(image)
-      return true
+      return image
     } catch (error) {
       if (error instanceof CacheLookupError) {
-        await e.reply(error.message)
-        return true
+        return error.message
       }
 
       if (error?.code === 'ENOENT') {
-        await e.reply(buildMissingDataMessage(parsed.mode, parsed.keyword))
-        return true
+        return buildMissingDataMessage(parsed.mode, parsed.keyword)
       }
 
       globalThis.logger?.error?.('[azurlane-plugin] 查询舰船资料失败', error)
-      await e.reply('查询失败了，请检查本地缓存数据是否存在且格式正确。')
-      return true
+      return '查询失败了，请检查本地缓存数据是否存在且格式正确。'
     }
   }
 
@@ -118,39 +116,34 @@ export class AzurLaneWiki extends plugin {
 
   async updatePlugin(e) {
     if (!await this.checkAuth(e)) {
-      return true
+      return '只有主人才能使用这个命令。'
     }
 
     try {
       const result = await updatePluginFromGit()
-      await e.reply(formatGitUpdateReply(result))
-      return true
+      return formatGitUpdateReply(result)
     } catch (error) {
       globalThis.logger?.error?.('[azurlane-plugin] 插件更新失败', error)
-      await e.reply(formatGitUpdateError(error))
-      return true
+      return formatGitUpdateError(error)
     }
   }
 
   async updateShipData(e) {
     if (!await this.checkAuth(e)) {
-      return true
+      return '只有主人才能使用这个命令。'
     }
 
     const keyword = parseShipUpdateCommand(e.original_msg || e.msg)
     if (!keyword) {
-      await e.reply('请输入要更新的舰船名称，例如：!更新卡辛数据')
-      return true
+      return '请输入要更新的舰船名称，例如：!更新卡辛数据'
     }
 
     try {
       const result = await refreshShipBundleByName(keyword)
-      await e.reply(formatShipRefreshReply(result))
-      return true
+      return formatShipRefreshReply(result)
     } catch (error) {
       globalThis.logger?.error?.('[azurlane-plugin] 更新舰船缓存失败', error)
-      await e.reply(`更新 ${keyword} 数据失败：${error?.message || error}`)
-      return true
+      return `更新 ${keyword} 数据失败：${error?.message || error}`
     }
   }
 }
