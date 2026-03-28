@@ -11,11 +11,13 @@ import {
 } from '../model/admin-service.js'
 import { WIKI_COMMAND_RULE, buildMissingDataMessage, buildRenderFailureMessage, parseWikiCommand } from '../model/wiki-command.js'
 
-const UPDATE_PLUGIN_RULE = '^(?:&|＆)碧蓝航线插件更新$'
-const UPDATE_SHIP_DATA_RULE = '^(?:&|＆)更新(.+?)数据$'
+const COMMAND_HEAD = '(?:(?:!|！)\\s*(?:碧蓝|碧蓝航线|blhx)?|(?:碧蓝|碧蓝航线|blhx))\\s*'
+const UPDATE_PLUGIN_RULE = `^${COMMAND_HEAD}插件更新$`
+const UPDATE_SHIP_DATA_RULE = `^${COMMAND_HEAD}更新(.+?)数据$`
+let initLogged = false
 
 function parseShipUpdateCommand(message) {
-  const match = String(message ?? '').trim().match(/^(?:&|＆)更新(.+?)数据$/i)
+  const match = String(message ?? '').trim().match(/^(?:(?:!|！)\s*(?:碧蓝|碧蓝航线|blhx)?|(?:碧蓝|碧蓝航线|blhx))\s*更新(.+?)数据$/i)
   if (!match) {
     return ''
   }
@@ -45,6 +47,15 @@ export class AzurLaneWiki extends plugin {
         }
       ]
     })
+
+    if (!initLogged) {
+      initLogged = true
+      const message = '[azurlane-plugin] 碧蓝航线 Wiki 插件初始化成功，已启用命令：!xxx / ！xxx / 碧蓝xxx'
+      globalThis.logger?.info?.(message)
+      if (!globalThis.logger?.info) {
+        console.info(message)
+      }
+    }
   }
 
   async checkAuth(e) {
@@ -127,7 +138,7 @@ export class AzurLaneWiki extends plugin {
 
     const keyword = parseShipUpdateCommand(e.original_msg || e.msg)
     if (!keyword) {
-      await e.reply('请输入要更新的舰船名称，例如：&更新卡辛数据')
+      await e.reply('请输入要更新的舰船名称，例如：!更新卡辛数据')
       return true
     }
 
