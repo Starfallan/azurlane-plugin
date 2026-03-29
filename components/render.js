@@ -6,6 +6,7 @@ import { fileURLToPath, pathToFileURL } from 'node:url'
 const PLUGIN_NAME = 'azurlane-plugin'
 import { buildShipCardViewModel } from '../model/ship-card-data.js'
 import { buildShipEquipCardViewModel } from '../model/ship-equip-card-data.js'
+import { buildEquipCardViewModel } from '../model/equip-card-data.js'
 
 const PLUGIN_ROOT = path.resolve(fileURLToPath(new URL('..', import.meta.url)))
 const RESOURCE_ROOT = path.join(PLUGIN_ROOT, 'resources')
@@ -15,7 +16,8 @@ const DEFAULT_LAYOUT_FILE = path.join(RESOURCE_ROOT, 'common', 'layout', 'defaul
 const RENDER_TEMPLATE_VERSION = {
   ship: 'ship-card-v1',
   skill: 'ship-card-skill-v1',
-  equip: 'ship-equip-card-v4'
+  equip: 'ship-equip-card-v4',
+  equipItem: 'equip-card-v2'
 }
 
 const IMAGE_CACHE_ROOT = path.join(PLUGIN_ROOT, 'temp', 'render-cache')
@@ -38,6 +40,66 @@ function normalizeSaveIdPart(value) {
 function buildSaveId(parts) {
   const normalized = parts.map(normalizeSaveIdPart).filter(Boolean)
   return normalized.length ? normalized.join('--') : `${PLUGIN_NAME}-render`
+}
+
+function stableSerialize(value) {
+  if (value === null || value === undefined) {
+    return 'null'
+  }
+
+  const type = typeof value
+  if (type === 'number' || type === 'boolean') {
+    return JSON.stringify(value)
+  }
+
+  if (type === 'string') {
+    return JSON.stringify(value)
+  }
+
+  if (Array.isArray(value)) {
+    return `[${value.map((item) => stableSerialize(item)).join(',')}]`
+  }
+
+  const keys = Object.keys(value)
+    .filter((key) => value[key] !== undefined)
+    .sort((a, b) => a.localeCompare(b))
+
+  return `{${keys.map((key) => `${JSON.stringify(key)}:${stableSerialize(value[key])}`).join(',')}}`
+}
+
+function stripCacheNoise(payload) {
+  if (payload === null || payload === undefined) {
+    return payload
+  }
+
+  if (Array.isArray(payload)) {
+    return payload.map((item) => stripCacheNoise(item))
+  }
+
+  if (typeof payload !== 'object') {
+    return payload
+  }
+
+  const output = {}
+  for (const [key, value] of Object.entries(payload)) {
+    if (key === 'keyword' || key === 'alternatives') {
+      continue
+    }
+
+    output[key] = stripCacheNoise(value)
+  }
+
+  return output
+}
+
+function buildPayloadCacheId({ rendererKey, templateVersion, identity, payload }) {
+  const normalizedPayload = stripCacheNoise(payload)
+  const digest = createHash('sha256')
+    .update(stableSerialize({ rendererKey, templateVersion, payload: normalizedPayload }))
+    .digest('hex')
+    .slice(0, 24)
+
+  return buildSaveId([PLUGIN_NAME, rendererKey, templateVersion, identity, digest])
 }
 
 function getShipIdentity(ship) {
@@ -185,12 +247,13 @@ function wrapRenderedImage(image) {
 
 function createShipCardRenderData({ ship, mode, keyword, alternatives, cacheMeta }) {
   const view = buildShipCardViewModel({ ship, mode, keyword, alternatives, cacheMeta })
-  const saveId = buildSaveId([
-    PLUGIN_NAME,
-    RENDER_TEMPLATE_VERSION[mode] || RENDER_TEMPLATE_VERSION.ship,
-    getShipIdentity(ship),
-    ship?.cacheUpdatedAt || cacheMeta?.generatedAt || 'static'
-  ])
+  const templateVersion = RENDER_TEMPLATE_VERSION[mode] || RENDER_TEMPLATE_VERSION.ship
+  const saveId = buildPayloadCacheId({
+    rendererKey: 'wiki/ship-card',
+    templateVersion,
+    identity: getShipIdentity(ship),
+    payload: view
+  })
 
   return {
     ...view,
@@ -207,13 +270,12 @@ function createShipCardRenderData({ ship, mode, keyword, alternatives, cacheMeta
 
 function createShipEquipRenderData({ ship, equip, keyword, alternatives, cacheMeta }) {
   const view = buildShipEquipCardViewModel({ ship, equip, keyword, alternatives, cacheMeta })
-  const saveId = buildSaveId([
-    PLUGIN_NAME,
-    RENDER_TEMPLATE_VERSION.equip,
-    getShipIdentity(ship),
-    ship?.cacheUpdatedAt || cacheMeta?.generatedAt || 'ship-static',
-    equip?.generated_at || 'equip-static'
-  ])
+  const saveId = buildPayloadCacheId({
+    rendererKey: 'wiki/ship-equip-card',
+    templateVersion: RENDER_TEMPLATE_VERSION.equip,
+    identity: getShipIdentity(ship),
+    payload: view
+  })
 
   return {
     ...view,
@@ -224,6 +286,28 @@ function createShipEquipRenderData({ ship, equip, keyword, alternatives, cacheMe
     sys: {
       scale: buildScaleStyle(1),
       copyright: `AzurLane Wiki Cache · ${view.generated_at_display || cacheMeta?.generatedAt || 'local'}`
+    }
+  }
+}
+
+function createEquipRenderData({ equip, entry, keyword, alternatives }) {
+  const view = buildEquipCardViewModel({ equip, entry, keyword, alternatives })
+  const saveId = buildPayloadCacheId({
+    rendererKey: 'wiki/equip-card',
+    templateVersion: RENDER_TEMPLATE_VERSION.equipItem,
+    identity: view.full_name || view.equip_name || 'unknown-equip',
+    payload: view
+  })
+
+  return {
+    ...view,
+    saveId,
+    tplFile: `./plugins/${PLUGIN_NAME}/resources/wiki/equip-card.html`,
+    defaultLayout: `./plugins/${PLUGIN_NAME}/resources/common/layout/default.html`,
+    _res_path: `./plugins/${PLUGIN_NAME}/resources/`,
+    sys: {
+      scale: buildScaleStyle(1),
+      copyright: `AzurLane Wiki Cache · ${view.generated_at_display || 'local'}`
     }
   }
 }
@@ -314,4 +398,13 @@ export async function renderShipEquipCard(e, payload) {
 
   const data = createShipEquipRenderData(payload)
   return renderByTemplate(e, 'wiki/ship-equip-card', data)
+}
+
+export async function renderEquipCard(e, payload) {
+  if (!e) {
+    return false
+  }
+
+  const data = createEquipRenderData(payload)
+  return renderByTemplate(e, 'wiki/equip-card', data)
 }

@@ -1,0 +1,139 @@
+{{extend defaultLayout}}
+
+{{block 'css'}}
+<link rel="stylesheet" type="text/css" href="{{_res_path}}wiki/equip-card.css" />
+<style>
+  @font-face {
+    font-family: 'MiSans';
+    src: url('{{_res_path}}common/fonts/MiSans-Regular.woff2') format('woff2');
+    font-weight: 400;
+    font-style: normal;
+    font-display: swap;
+  }
+
+  .equip-card,
+  .equip-card * {
+    font-family: 'MiSans', 'HarmonyOS Sans SC', 'PingFang SC', 'Microsoft YaHei', sans-serif;
+  }
+</style>
+{{/block}}
+
+{{block 'main'}}
+<div class="equip-card rarity-{{rarity_class}}">
+  <div class="equip-card-grid">
+    <section class="left-column">
+      <div class="equip-header panel">
+        <div class="equip-title-wrap">
+          <h1 class="equip-name">{{equip_name}}{{if tier}} {{tier}}{{/if}}</h1>
+          {{if updated_hint}}<span class="updated-hint">更新于 {{updated_hint}}</span>{{/if}}
+        </div>
+
+        <div class="badge-row">
+          {{each badge_list item}}
+          <span class="badge-item">{{item}}</span>
+          {{/each}}
+        </div>
+
+        <div class="equip-top-body">
+          <div class="equip-image-box">
+            {{if image_src}}
+            <img src="{{image_src}}" alt="{{equip_name}}" />
+            {{else}}
+            <div class="equip-image-empty">NO IMAGE</div>
+            {{/if}}
+          </div>
+          <div class="equip-basic-meta">
+            <div class="meta-row"><span>装备类型</span><b>{{equipment_type || '未知'}}</b></div>
+            <div class="meta-row"><span>所属阵营</span><b>{{faction || '未知'}}</b></div>
+            <div class="meta-row"><span>稀有度</span><b>{{rarity}}</b></div>
+          </div>
+        </div>
+      </div>
+
+      <div class="panel attr-panel">
+        <div class="panel-title">装备属性</div>
+        {{if has_attr_rows}}
+        <div class="attr-table">
+          {{each attr_rows row}}
+          {{if row.kind === 'section'}}
+          <div class="attr-section-row">
+            <span class="label">{{row.label}}</span>
+            <span class="value">{{if row.has_value}}{{row.value}}{{else}}-{{/if}}</span>
+          </div>
+          {{else}}
+          <div class="attr-item-row depth-{{row.depth}}">
+            <span class="label" style="padding-left: {{row.indent_px}}px;">{{row.label}}</span>
+            <span class="value">{{row.value}}</span>
+          </div>
+          {{/if}}
+          {{/each}}
+        </div>
+        {{else}}
+        <div class="empty-text">当前装备没有解析到属性节点。</div>
+        {{/if}}
+      </div>
+    </section>
+
+    <aside class="right-column">
+      <div class="panel acquire-panel">
+        <div class="panel-title">获取方式</div>
+        {{if has_acquisition_rows}}
+        <div class="acquire-table">
+          {{each acquisition_rows row}}
+          <div class="acquire-row">
+            <span class="label">{{row.label}}</span>
+            <span class="value">
+              {{if row.is_research_route && row.route_items && row.route_items.length}}
+              <span class="route-flow">
+                {{each row.route_items route}}
+                {{if route.type === 'arrow'}}
+                <span class="route-arrow">{{route.text}}</span>
+                {{else}}
+                <span class="route-equip" title="{{route.full_name || route.display_name}}">
+                  {{if route.image_src}}<img src="{{route.image_src}}" alt="{{route.display_name}}" />{{/if}}
+                  <span class="route-name">{{route.display_name}}</span>
+                </span>
+                {{/if}}
+                {{/each}}
+              </span>
+              {{else}}
+              <span class="acquire-text{{if row.multiline || row.label === '图纸获取'}} multiline{{/if}}">{{@row.value_html || '-'}}</span>
+              {{/if}}
+            </span>
+          </div>
+          {{/each}}
+        </div>
+        {{else}}
+        <div class="empty-text">未解析到获取信息。</div>
+        {{/if}}
+
+        {{if acquisition_demo_image}}
+        <div class="demo-image-wrap">
+          <img src="{{acquisition_demo_image}}" alt="{{equip_name}}示意图" />
+        </div>
+        {{/if}}
+
+        {{if acquisition_remark}}
+        <div class="remark-box">
+          <span class="remark-tag">备注</span>
+          <span class="remark-value">{{acquisition_remark}}</span>
+        </div>
+        {{/if}}
+      </div>
+
+      <div class="panel shiptype-panel">
+        <div class="panel-title">使用舰种</div>
+        {{if has_ship_type_chips}}
+        <div class="shiptype-grid">
+          {{each ship_type_chips item}}
+          <span class="shiptype-chip{{if item.enabled}} is-enabled{{/if}}{{if item.forbidden}} is-forbidden{{/if}}">{{item.name}}</span>
+          {{/each}}
+        </div>
+        {{else}}
+        <div class="empty-text">未解析到使用舰种。</div>
+        {{/if}}
+      </div>
+    </aside>
+  </div>
+</div>
+{{/block}}

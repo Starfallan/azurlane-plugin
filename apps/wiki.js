@@ -1,6 +1,7 @@
 import plugin from '../../../lib/plugins/plugin.js'
-import { renderShipCard, renderShipEquipCard } from '../components/render.js'
+import { renderEquipCard, renderShipCard, renderShipEquipCard } from '../components/render.js'
 import { CacheLookupError, findShipFromCache } from '../model/cache-store.js'
+import { EquipLookupError, findEquipFromCache } from '../model/equip-cache-store.js'
 import { readShipEquipData } from '../model/ship-store.js'
 import {
   formatGitUpdateError,
@@ -93,6 +94,14 @@ export class AzurLaneWiki extends plugin {
   async dispatchWikiCommand(e, parsed) {
     e.azurlaneWiki = parsed
 
+    if (parsed.rawMode === '装备') {
+      const equipResult = await this.dispatchEquipAttributeCommand(e, parsed)
+      if (equipResult !== null) {
+        return equipResult
+      }
+      // 装备名未命中时回退到舰船配装查询，兼容旧习惯。
+    }
+
     try {
       const { ship, alternatives, cacheMeta } = await findShipFromCache(parsed.keyword)
       const image = parsed.mode === 'equip'
@@ -115,6 +124,38 @@ export class AzurLaneWiki extends plugin {
 
       globalThis.logger?.error?.('[azurlane-plugin] 查询舰船资料失败', error)
       return '查询失败了，请检查本地缓存数据是否存在且格式正确。'
+    }
+  }
+
+  async dispatchEquipAttributeCommand(e, parsed) {
+    try {
+      const { equip, entry, alternatives } = await findEquipFromCache(parsed.keyword)
+      const image = await renderEquipCard(e, {
+        equip,
+        entry,
+        keyword: parsed.keyword,
+        alternatives
+      })
+
+      if (!image) {
+        return '装备属性图片渲染失败，请检查 Yunzai 的 Puppeteer 渲染器配置。'
+      }
+
+      return image
+    } catch (error) {
+      if (error instanceof EquipLookupError) {
+        if (error.reason === 'not-found') {
+          return null
+        }
+        return error.message
+      }
+
+      if (error?.code === 'ENOENT') {
+        return `本地还没有这条装备的属性缓存，请先执行 \`pnpm run build:equip -- --only=${parsed.keyword}\`。`
+      }
+
+      globalThis.logger?.error?.('[azurlane-plugin] 查询装备属性失败', error)
+      return '查询装备属性失败，请检查本地装备缓存是否存在且格式正确。'
     }
   }
 
@@ -148,7 +189,7 @@ export class AzurLaneWiki extends plugin {
 
     const keyword = parseShipUpdateCommand(e.original_msg || e.msg)
     if (!keyword) {
-      return '请输入要更新的舰船名称，例如：!更新卡辛数据'
+      return '请输入要更新的舰船名称，例如：;更新卡辛数据'
     }
 
     try {
