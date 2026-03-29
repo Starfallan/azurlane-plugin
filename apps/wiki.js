@@ -23,6 +23,24 @@ const UPDATE_PLUGIN_RULE = new RegExp(`^${COMMAND_HEAD}插件更新${COMMAND_TAI
 const UPDATE_SHIP_DATA_RULE = new RegExp(`^${COMMAND_HEAD}更新(.+?)数据${COMMAND_TAIL}`, 'i')
 let initLogged = false
 
+const MODE_ALIAS = {
+  属性: 'attribute',
+  装备: 'equip',
+  配装: 'ship-equip',
+  配装推荐: 'ship-equip',
+  推荐配装: 'ship-equip',
+  技能: 'skill',
+  天赋: 'skill',
+  资料: 'ship',
+  图鉴: 'ship'
+}
+
+const ROUTE_STEP = {
+  EQUIP_ATTRIBUTE: 'equip-attribute',
+  SHIP_CARD: 'ship-card',
+  SHIP_EQUIP: 'ship-equip'
+}
+
 function isUpdatePluginCommand(message) {
   return UPDATE_PLUGIN_RULE.test(String(message ?? '').trim())
 }
@@ -60,35 +78,78 @@ function parseEquipDirectCommand(message) {
   }
 }
 
-async function dispatchDirectKeyword(pluginInstance, e, parsed) {
-  const equipResult = await pluginInstance.dispatchEquipAttributeCommand(e, parsed)
-  if (equipResult !== null) {
-    return equipResult
+function parseIncomingCommand(message) {
+  if (isUpdatePluginCommand(message)) {
+    return { type: 'admin-update-plugin' }
   }
 
-  try {
-    const { ship, alternatives, cacheMeta } = await findShipFromCache(parsed.keyword)
-    const image = await pluginInstance.renderWikiCard(e, {
-      ship,
-      mode: 'ship',
-      keyword: parsed.keyword,
-      alternatives,
-      cacheMeta
-    })
-
-    if (!image) {
-      return buildRenderFailureMessage('ship')
+  const updateKeyword = parseShipUpdateCommand(message)
+  if (updateKeyword) {
+    return {
+      type: 'admin-update-ship',
+      keyword: updateKeyword
     }
-
-    return image
-  } catch (error) {
-    if (error instanceof CacheLookupError) {
-      return `未找到“${parsed.keyword}”对应的装备或舰船。`
-    }
-
-    globalThis.logger?.error?.('[azurlane-plugin] 裸指令分流查询失败', error)
-    return '查询失败了，请检查本地缓存数据是否存在且格式正确。'
   }
+
+  const parsed = parseWikiCommand(message)
+  if (parsed) {
+    return {
+      type: 'wiki',
+      parsed,
+      source: 'explicit'
+    }
+  }
+
+  const directParsed = parseEquipDirectCommand(message)
+  if (!directParsed) {
+    return null
+  }
+
+  return {
+    type: 'wiki',
+    parsed: directParsed,
+    source: 'direct'
+  }
+}
+
+function buildRoutePlan(parsed, source) {
+  if (source === 'direct') {
+    return {
+      steps: [ROUTE_STEP.EQUIP_ATTRIBUTE, ROUTE_STEP.SHIP_CARD],
+      missMessage: `未找到“${parsed.keyword}”对应的装备或舰船。`
+    }
+  }
+
+  const routeType = MODE_ALIAS[parsed.rawMode] || 'ship'
+  if (routeType === 'attribute') {
+    return {
+      steps: [ROUTE_STEP.EQUIP_ATTRIBUTE, ROUTE_STEP.SHIP_CARD],
+      missMessage: `未找到“${parsed.keyword}”对应的装备或舰船。`
+    }
+  }
+
+  if (routeType === 'equip') {
+    return {
+      steps: [ROUTE_STEP.EQUIP_ATTRIBUTE, ROUTE_STEP.SHIP_EQUIP],
+      missMessage: `未找到“${parsed.keyword}”对应的装备或舰船。`
+    }
+  }
+
+  if (routeType === 'ship-equip') {
+    return {
+      steps: [ROUTE_STEP.SHIP_EQUIP],
+      missMessage: `本地缓存里没有找到“${parsed.keyword}”，请先确认名称或重新构建缓存。`
+    }
+  }
+
+  return {
+    steps: [ROUTE_STEP.SHIP_CARD],
+    missMessage: `本地缓存里没有找到“${parsed.keyword}”，请先确认名称或重新构建缓存。`
+  }
+}
+
+function isReplyPayload(payload) {
+  return payload !== null && payload !== undefined && payload !== false
 }
 
 export class AzurLaneWiki extends plugin {
@@ -130,60 +191,153 @@ export class AzurLaneWiki extends plugin {
       return false
     }
 
-    if (isUpdatePluginCommand(message)) {
-      return this.updatePlugin(e)
-    }
-
-    if (parseShipUpdateCommand(message)) {
-      return this.updateShipData(e)
-    }
-
-    const parsed = parseWikiCommand(message)
-    if (!parsed) {
-      const equipDirectParsed = parseEquipDirectCommand(message)
-      if (equipDirectParsed) {
-        return dispatchDirectKeyword(this, e, equipDirectParsed)
-      }
-
+    const command = parseIncomingCommand(message)
+    if (!command) {
       return false
     }
 
-    return this.dispatchWikiCommand(e, parsed)
+    let result = false
+
+    if (command.type === 'admin-update-plugin') {
+      result = await this.updatePlugin(e)
+    } else if (command.type === 'admin-update-ship') {
+      result = await this.updateShipData(e)
+    } else if (command.type === 'wiki') {
+      result = await this.dispatchWikiCommand(e, command.parsed, command.source)
+    }
+
+    return this.replyWithResult(e, result)
   }
 
-  async dispatchWikiCommand(e, parsed) {
-    e.azurlaneWiki = parsed
+  async replyWithResult(e, payload) {
+    if (payload === true || payload === false) {
+      return payload
+    }
 
-    if (parsed.rawMode === '装备' || parsed.rawMode === '属性') {
-      const equipResult = await this.dispatchEquipAttributeCommand(e, parsed)
-      if (equipResult !== null) {
-        return equipResult
-      }
-      // 装备名未命中时回退到舰船查询，兼容旧习惯。
+    if (!isReplyPayload(payload)) {
+      return false
     }
 
     try {
-      const { ship, alternatives, cacheMeta } = await findShipFromCache(parsed.keyword)
-      const image = parsed.mode === 'equip'
-        ? await this.renderEquipCard(e, { ship, keyword: parsed.keyword, alternatives, cacheMeta })
-        : await this.renderWikiCard(e, { ship, mode: parsed.mode, keyword: parsed.keyword, alternatives, cacheMeta })
+      await e.reply(payload)
+      return true
+    } catch (error) {
+      globalThis.logger?.error?.('[azurlane-plugin] 发送回复失败', error)
+      return false
+    }
+  }
 
-      if (!image) {
-        return buildRenderFailureMessage(parsed.mode)
+  async dispatchWikiCommand(e, parsed, source = 'explicit') {
+    e.azurlaneWiki = parsed
+
+    const plan = buildRoutePlan(parsed, source)
+    for (const step of plan.steps) {
+      const attempt = await this.dispatchRouteStep(e, parsed, step)
+      if (attempt.hit) {
+        return attempt.payload
+      }
+      if (attempt.fatal) {
+        return attempt.payload
+      }
+    }
+
+    return plan.missMessage
+  }
+
+  async dispatchRouteStep(e, parsed, step) {
+    if (step === ROUTE_STEP.EQUIP_ATTRIBUTE) {
+      const payload = await this.dispatchEquipAttributeCommand(e, parsed)
+      if (payload === null) {
+        return { hit: false, fatal: false, payload: null }
       }
 
-      return image
+      return { hit: true, fatal: false, payload }
+    }
+
+    if (step === ROUTE_STEP.SHIP_CARD) {
+      return this.dispatchShipCardCommand(e, parsed)
+    }
+
+    if (step === ROUTE_STEP.SHIP_EQUIP) {
+      return this.dispatchShipEquipCommand(e, parsed)
+    }
+
+    return { hit: false, fatal: true, payload: '查询配置异常，请稍后重试。' }
+  }
+
+  async dispatchShipCardCommand(e, parsed) {
+    try {
+      const { ship, alternatives, cacheMeta } = await findShipFromCache(parsed.keyword)
+      const mode = parsed.mode === 'skill' ? 'skill' : 'ship'
+      const image = await this.renderWikiCard(e, {
+        ship,
+        mode,
+        keyword: parsed.keyword,
+        alternatives,
+        cacheMeta
+      })
+
+      if (!image) {
+        return { hit: true, fatal: false, payload: buildRenderFailureMessage(mode) }
+      }
+
+      return { hit: true, fatal: false, payload: image }
     } catch (error) {
       if (error instanceof CacheLookupError) {
-        return error.message
+        return { hit: false, fatal: false, payload: null }
       }
 
       if (error?.code === 'ENOENT') {
-        return buildMissingDataMessage(parsed.mode, parsed.keyword)
+        return {
+          hit: true,
+          fatal: false,
+          payload: buildMissingDataMessage('ship', parsed.keyword)
+        }
       }
 
       globalThis.logger?.error?.('[azurlane-plugin] 查询舰船资料失败', error)
-      return '查询失败了，请检查本地缓存数据是否存在且格式正确。'
+      return {
+        hit: true,
+        fatal: true,
+        payload: '查询失败了，请检查本地缓存数据是否存在且格式正确。'
+      }
+    }
+  }
+
+  async dispatchShipEquipCommand(e, parsed) {
+    try {
+      const { ship, alternatives, cacheMeta } = await findShipFromCache(parsed.keyword)
+      const image = await this.renderEquipCard(e, {
+        ship,
+        keyword: parsed.keyword,
+        alternatives,
+        cacheMeta
+      })
+
+      if (!image) {
+        return { hit: true, fatal: false, payload: buildRenderFailureMessage('equip') }
+      }
+
+      return { hit: true, fatal: false, payload: image }
+    } catch (error) {
+      if (error instanceof CacheLookupError) {
+        return { hit: false, fatal: false, payload: null }
+      }
+
+      if (error?.code === 'ENOENT') {
+        return {
+          hit: true,
+          fatal: false,
+          payload: buildMissingDataMessage('equip', parsed.keyword)
+        }
+      }
+
+      globalThis.logger?.error?.('[azurlane-plugin] 查询舰船配装失败', error)
+      return {
+        hit: true,
+        fatal: true,
+        payload: '查询失败了，请检查本地缓存数据是否存在且格式正确。'
+      }
     }
   }
 
