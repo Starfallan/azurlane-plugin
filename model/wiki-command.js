@@ -1,9 +1,9 @@
-const TRAILING_PUNCTUATION = '[.。!！~～…]*'
-export const WIKI_COMMAND_PREFIX_RULE = /^(?:!|！|碧蓝|碧蓝航线|blhx).*$/i
+const TRAILING_PUNCTUATION = '[.。~～…]*'
+export const WIKI_COMMAND_PREFIX_RULE = /^(?:;|；|碧蓝|碧蓝航线|blhx).*$/i
 
-export const WIKI_COMMAND_RULE = new RegExp(`^(?:(?:!|！)\\s*(?:碧蓝|碧蓝航线|blhx)?|(?:碧蓝|碧蓝航线|blhx))\\s*(.+?)(技能|天赋|资料|图鉴|属性|配装|配装推荐|推荐配装|装备)${TRAILING_PUNCTUATION}$`, 'i')
+export const WIKI_COMMAND_RULE = new RegExp(`^(?:(?:;|；)\\s*(?:碧蓝|碧蓝航线|blhx)?|(?:碧蓝|碧蓝航线|blhx))\\s*(.+?)(技能|天赋|资料|图鉴|属性|配装|配装推荐|推荐配装|装备)${TRAILING_PUNCTUATION}$`, 'i')
 
-const WIKI_COMMAND_REG = /^(?:(?:!|！)\s*(?:碧蓝|碧蓝航线|blhx)?|(?:碧蓝|碧蓝航线|blhx))\s*(.+?)(技能|天赋|资料|图鉴|属性|配装|配装推荐|推荐配装|装备)[.。!！~～…]*$/i
+const WIKI_COMMAND_REG = /^(?:(?:;|；)\s*(?:碧蓝|碧蓝航线|blhx)?|(?:碧蓝|碧蓝航线|blhx))\s*(.+?)(技能|天赋|资料|图鉴|属性|配装|配装推荐|推荐配装|装备)[.。~～…]*$/i
 
 export function parseWikiCommand(message) {
   const rawMessage = String(message ?? '').trim()
