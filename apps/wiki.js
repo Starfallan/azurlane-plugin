@@ -603,16 +603,8 @@ export class AzurLaneWiki extends plugin {
 
     const forwardImages = []
     for (const skin of selectedSkins) {
-      const base64File = await readImagePointerToBase64(skin.fullPath)
-      if (!base64File) {
-        continue
-      }
-      forwardImages.push(globalThis.segment?.image?.(base64File) ?? {
-        type: 'image',
-        data: {
-          file: base64File
-        }
-      })
+      const fileUrl = pathToFileURL(skin.fullPath).href
+      forwardImages.push(globalThis.segment?.image?.(fileUrl) ?? fileUrl)
     }
 
     if (!forwardImages.length) {
