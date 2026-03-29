@@ -1,7 +1,7 @@
 import plugin from '../../../lib/plugins/plugin.js'
 import fs from 'node:fs/promises'
 import path from 'node:path'
-import { pathToFileURL } from 'node:url'
+import { fileURLToPath, pathToFileURL } from 'node:url'
 import { renderEquipCard, renderShipCard, renderShipEquipCard } from '../components/render.js'
 import { CacheLookupError, findShipFromCache, getCharacterRoot, toShipDirName } from '../model/cache-store.js'
 import { EquipLookupError, findEquipFromCache } from '../model/equip-cache-store.js'
@@ -206,6 +206,95 @@ function isReplyPayload(payload) {
   return payload !== null && payload !== undefined && payload !== false
 }
 
+function isImagePointerString(value) {
+  const text = String(value ?? '').trim()
+  if (!text) {
+    return false
+  }
+
+  return text.startsWith('base64://')
+    || /^data:image\/[a-z0-9.+-]+;base64,/i.test(text)
+    || /^file:/i.test(text)
+    || path.isAbsolute(text)
+}
+
+async function readImagePointerToBase64(pointer) {
+  const raw = String(pointer ?? '').trim()
+  if (!raw) {
+    return ''
+  }
+
+  if (raw.startsWith('base64://')) {
+    return raw
+  }
+
+  const dataUrlMatch = raw.match(/^data:image\/[a-z0-9.+-]+;base64,(.+)$/i)
+  if (dataUrlMatch) {
+    return `base64://${dataUrlMatch[1]}`
+  }
+
+  let filePath = ''
+  if (/^file:/i.test(raw)) {
+    filePath = fileURLToPath(raw)
+  } else if (path.isAbsolute(raw)) {
+    filePath = raw
+  }
+
+  if (!filePath) {
+    return ''
+  }
+
+  const buffer = await fs.readFile(filePath)
+  return `base64://${buffer.toString('base64')}`
+}
+
+async function normalizeReplyPayload(payload) {
+  if (Array.isArray(payload)) {
+    const output = []
+    for (const item of payload) {
+      output.push(await normalizeReplyPayload(item))
+    }
+    return output
+  }
+
+  if (typeof payload === 'string') {
+    if (!isImagePointerString(payload)) {
+      return payload
+    }
+
+    const base64File = await readImagePointerToBase64(payload)
+    if (!base64File) {
+      return payload
+    }
+
+    return globalThis.segment?.image?.(base64File) ?? {
+      type: 'image',
+      data: {
+        file: base64File
+      }
+    }
+  }
+
+  if (payload && typeof payload === 'object') {
+    if (payload.type === 'image' && typeof payload.data?.file === 'string') {
+      const base64File = await readImagePointerToBase64(payload.data.file)
+      if (!base64File) {
+        return payload
+      }
+
+      return {
+        ...payload,
+        data: {
+          ...payload.data,
+          file: base64File
+        }
+      }
+    }
+  }
+
+  return payload
+}
+
 export class AzurLaneWiki extends plugin {
   constructor() {
     super({
@@ -275,7 +364,8 @@ export class AzurLaneWiki extends plugin {
     }
 
     try {
-      await e.reply(payload)
+      const normalizedPayload = await normalizeReplyPayload(payload)
+      await e.reply(normalizedPayload)
       return true
     } catch (error) {
       globalThis.logger?.error?.('[azurlane-plugin] 发送回复失败', error)
