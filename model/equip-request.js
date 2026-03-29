@@ -1,7 +1,7 @@
 import fs from 'node:fs/promises'
-import path from 'node:path'
+import { fileURLToPath } from 'node:url'
 
-const EQUIP_REQUEST_CONFIG_FILE = path.resolve('resources', 'equip', 'request-config.local.json')
+const EQUIP_REQUEST_CONFIG_FILE = fileURLToPath(new URL('../resources/equip/request-config.local.json', import.meta.url))
 const DEFAULT_REQUEST_HEADERS = {
   'accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.7',
   'accept-language': 'zh-CN,zh;q=0.9,en;q=0.8,en-GB;q=0.7,en-US;q=0.6',

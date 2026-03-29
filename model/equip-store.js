@@ -1,8 +1,9 @@
 import fs from 'node:fs/promises'
 import path from 'node:path'
+import { fileURLToPath } from 'node:url'
 import { fetchWithRetry } from './equip-request.js'
 
-export const EQUIP_ROOT = path.resolve('resources', 'equip')
+export const EQUIP_ROOT = fileURLToPath(new URL('../resources/equip', import.meta.url))
 export const EQUIP_INDEX_FILE = path.join(EQUIP_ROOT, '装备图鉴_装备基础属性.json')
 export const EQUIP_HTML_CACHE_DIR = path.join(EQUIP_ROOT, 'html')
 export const EQUIP_IMAGE_DIR = path.join(EQUIP_ROOT, 'img')
