@@ -20,6 +20,8 @@ const RENDER_TEMPLATE_VERSION = {
   equipItem: 'equip-card-v2'
 }
 
+const RENDER_SCALE = 1.6
+
 const IMAGE_CACHE_ROOT = path.join(PLUGIN_ROOT, 'temp', 'render-cache')
 const IMAGE_CACHE_TTL_MS = 7 * 24 * 60 * 60 * 1000
 const fallbackRenderCache = new Map()
@@ -252,7 +254,10 @@ function createShipCardRenderData({ ship, mode, keyword, alternatives, cacheMeta
     rendererKey: 'wiki/ship-card',
     templateVersion,
     identity: getShipIdentity(ship),
-    payload: view
+    payload: {
+      ...view,
+      _render_scale: RENDER_SCALE
+    }
   })
 
   return {
@@ -262,7 +267,7 @@ function createShipCardRenderData({ ship, mode, keyword, alternatives, cacheMeta
     defaultLayout: `./plugins/${PLUGIN_NAME}/resources/common/layout/default.html`,
     _res_path: `./plugins/${PLUGIN_NAME}/resources/`,
     sys: {
-      scale: buildScaleStyle(1),
+      scale: buildScaleStyle(RENDER_SCALE),
       copyright: `AzurLane Wiki Cache · ${cacheMeta?.generatedAt ?? 'local'}`
     }
   }
@@ -274,7 +279,10 @@ function createShipEquipRenderData({ ship, equip, keyword, alternatives, cacheMe
     rendererKey: 'wiki/ship-equip-card',
     templateVersion: RENDER_TEMPLATE_VERSION.equip,
     identity: getShipIdentity(ship),
-    payload: view
+    payload: {
+      ...view,
+      _render_scale: RENDER_SCALE
+    }
   })
 
   return {
@@ -284,7 +292,7 @@ function createShipEquipRenderData({ ship, equip, keyword, alternatives, cacheMe
     defaultLayout: `./plugins/${PLUGIN_NAME}/resources/common/layout/default.html`,
     _res_path: `./plugins/${PLUGIN_NAME}/resources/`,
     sys: {
-      scale: buildScaleStyle(1),
+      scale: buildScaleStyle(RENDER_SCALE),
       copyright: `AzurLane Wiki Cache · ${view.generated_at_display || cacheMeta?.generatedAt || 'local'}`
     }
   }
@@ -296,7 +304,10 @@ function createEquipRenderData({ equip, entry, keyword, alternatives }) {
     rendererKey: 'wiki/equip-card',
     templateVersion: RENDER_TEMPLATE_VERSION.equipItem,
     identity: view.full_name || view.equip_name || 'unknown-equip',
-    payload: view
+    payload: {
+      ...view,
+      _render_scale: RENDER_SCALE
+    }
   })
 
   return {
@@ -306,7 +317,7 @@ function createEquipRenderData({ equip, entry, keyword, alternatives }) {
     defaultLayout: `./plugins/${PLUGIN_NAME}/resources/common/layout/default.html`,
     _res_path: `./plugins/${PLUGIN_NAME}/resources/`,
     sys: {
-      scale: buildScaleStyle(1),
+      scale: buildScaleStyle(RENDER_SCALE),
       copyright: `AzurLane Wiki Cache · ${view.generated_at_display || 'local'}`
     }
   }

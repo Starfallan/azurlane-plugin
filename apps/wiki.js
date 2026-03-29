@@ -1,6 +1,9 @@
 import plugin from '../../../lib/plugins/plugin.js'
+import fs from 'node:fs/promises'
+import path from 'node:path'
+import { pathToFileURL } from 'node:url'
 import { renderEquipCard, renderShipCard, renderShipEquipCard } from '../components/render.js'
-import { CacheLookupError, findShipFromCache } from '../model/cache-store.js'
+import { CacheLookupError, findShipFromCache, getCharacterRoot, toShipDirName } from '../model/cache-store.js'
 import { EquipLookupError, findEquipFromCache } from '../model/equip-cache-store.js'
 import { readShipEquipData } from '../model/ship-store.js'
 import {
@@ -16,7 +19,7 @@ import {
   parseWikiCommand
 } from '../model/wiki-command.js'
 
-const COMMAND_HEAD = '(?:(?:;|；)\\s*(?:碧蓝|碧蓝航线|blhx)?|(?:碧蓝|碧蓝航线|blhx))\\s*'
+const COMMAND_HEAD = '(?:(?:;|；)\\s*(?:碧蓝|碧蓝航线|blhx)?|(?:碧蓝航线|碧蓝))\\s*'
 const MATCH_ALL_RULE = `^${COMMAND_HEAD}.*$`
 const COMMAND_TAIL = '[.。!！~～…]*$'
 const UPDATE_PLUGIN_RULE = new RegExp(`^${COMMAND_HEAD}插件更新${COMMAND_TAIL}`, 'i')
@@ -46,7 +49,7 @@ function isUpdatePluginCommand(message) {
 }
 
 function parseShipUpdateCommand(message) {
-  const match = String(message ?? '').trim().match(/^(?:(?:;|；)\s*(?:碧蓝|碧蓝航线|blhx)?|(?:碧蓝|碧蓝航线|blhx))\s*更新(.+?)数据[.。~～…]*$/i)
+  const match = String(message ?? '').trim().match(/^(?:(?:;|；)\s*(?:碧蓝|碧蓝航线|blhx)?|(?:碧蓝航线|碧蓝))\s*更新(.+?)数据[.。~～…]*$/i)
   if (!match) {
     return ''
   }
@@ -60,7 +63,7 @@ function parseEquipDirectCommand(message) {
     return null
   }
 
-  const match = raw.match(/^(?:(?:;|；)\s*(?:碧蓝|碧蓝航线|blhx)?|(?:碧蓝|碧蓝航线|blhx))\s*(.+?)[.。~～…]*$/i)
+  const match = raw.match(/^(?:(?:;|；)\s*(?:碧蓝|碧蓝航线|blhx)?|(?:碧蓝航线|碧蓝))\s*(.+?)[.。~～…]*$/i)
   if (!match) {
     return null
   }
@@ -78,6 +81,49 @@ function parseEquipDirectCommand(message) {
   }
 }
 
+function parseShipSkinCommand(message) {
+  const raw = String(message ?? '').trim()
+  if (!raw) {
+    return null
+  }
+
+  const match = raw.match(/^(?:(?:;|；)\s*(?:碧蓝|碧蓝航线|blhx)?|(?:碧蓝航线|碧蓝))\s*(.+?)\s*皮肤\s*(\d+)[.。!！~～…]*$/i)
+  if (!match) {
+    return null
+  }
+
+  const keyword = String(match[1] ?? '').replace(/\s+/g, '').trim()
+  const skinIndex = Number.parseInt(String(match[2] ?? ''), 10)
+  if (!keyword || !Number.isFinite(skinIndex) || skinIndex < 1) {
+    return null
+  }
+
+  return {
+    command: raw,
+    keyword,
+    skinIndex
+  }
+}
+
+function inferShipInternalName(ship) {
+  const direct = String(ship?.matched_internal_name ?? '').trim()
+  if (direct) {
+    return direct
+  }
+
+  const imagePath = String(ship?.image ?? '').trim().replace(/\\/g, '/')
+  const match = imagePath.match(/\/img\/([^/]+?)_group\.avif$/i)
+  return match?.[1] ? String(match[1]) : ''
+}
+
+function buildShipSkinFileName(internalName, skinIndex) {
+  if (skinIndex <= 1) {
+    return `${internalName}_group.avif`
+  }
+
+  return `${internalName}_${skinIndex}_group.avif`
+}
+
 function parseIncomingCommand(message) {
   if (isUpdatePluginCommand(message)) {
     return { type: 'admin-update-plugin' }
@@ -88,6 +134,14 @@ function parseIncomingCommand(message) {
     return {
       type: 'admin-update-ship',
       keyword: updateKeyword
+    }
+  }
+
+  const skinParsed = parseShipSkinCommand(message)
+  if (skinParsed) {
+    return {
+      type: 'ship-skin',
+      parsed: skinParsed
     }
   }
 
@@ -202,6 +256,8 @@ export class AzurLaneWiki extends plugin {
       result = await this.updatePlugin(e)
     } else if (command.type === 'admin-update-ship') {
       result = await this.updateShipData(e)
+    } else if (command.type === 'ship-skin') {
+      result = await this.dispatchShipSkinCommand(command.parsed)
     } else if (command.type === 'wiki') {
       result = await this.dispatchWikiCommand(e, command.parsed, command.source)
     }
@@ -370,6 +426,35 @@ export class AzurLaneWiki extends plugin {
 
       globalThis.logger?.error?.('[azurlane-plugin] 查询装备属性失败', error)
       return '查询装备属性失败，请检查本地装备缓存是否存在且格式正确。'
+    }
+  }
+
+  async dispatchShipSkinCommand(parsed) {
+    let ship
+    try {
+      const hit = await findShipFromCache(parsed.keyword)
+      ship = hit.ship
+    } catch (error) {
+      if (error instanceof CacheLookupError) {
+        return error.message
+      }
+
+      globalThis.logger?.error?.('[azurlane-plugin] 查询舰船皮肤失败', error)
+      return '查询皮肤失败了，请检查本地缓存数据是否存在且格式正确。'
+    }
+
+    const internalName = inferShipInternalName(ship)
+    if (!internalName) {
+      return `未找到“${ship.name}”对应的皮肤立绘。`
+    }
+
+    const fileName = buildShipSkinFileName(internalName, parsed.skinIndex)
+    const skinFile = path.join(getCharacterRoot(), toShipDirName(ship.name), 'img', fileName)
+    try {
+      await fs.access(skinFile)
+      return globalThis.segment?.image?.(pathToFileURL(skinFile).href) ?? pathToFileURL(skinFile).href
+    } catch {
+      return `未找到“${ship.name}”对应的皮肤立绘（皮肤${parsed.skinIndex}）。`
     }
   }
 
