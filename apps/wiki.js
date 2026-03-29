@@ -1,7 +1,7 @@
 import plugin from '../../../lib/plugins/plugin.js'
 import fs from 'node:fs/promises'
 import path from 'node:path'
-import { fileURLToPath, pathToFileURL } from 'node:url'
+import { fileURLToPath } from 'node:url'
 import common from '../../../lib/common/common.js'
 import { renderEquipCard, renderShipCard, renderShipEquipCard } from '../components/render.js'
 import { CacheLookupError, findShipFromCache, getCharacterRoot, toShipDirName } from '../model/cache-store.js'
@@ -603,7 +603,7 @@ export class AzurLaneWiki extends plugin {
 
     const forwardImages = []
     for (const skin of selectedSkins) {
-      const fileUrl = pathToFileURL(skin.fullPath).href
+      const fileUrl = `file://${skin.fullPath}`
       forwardImages.push(globalThis.segment?.image?.(fileUrl) ?? fileUrl)
     }
 
