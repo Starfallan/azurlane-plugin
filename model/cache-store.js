@@ -7,6 +7,7 @@ const SHIP_ALIAS_FILE = fileURLToPath(new URL('../resources/ship_aliases_from_ni
 
 let cachePromise
 let aliasMapPromise
+let shipAliasesPromise
 
 export class CacheLookupError extends Error {
   constructor(message) {
@@ -107,6 +108,7 @@ export async function getShipCache() {
 export function invalidateShipCache() {
   cachePromise = undefined
   aliasMapPromise = undefined
+  shipAliasesPromise = undefined
 }
 
 async function readAliasMapFromDisk() {
@@ -115,55 +117,87 @@ async function readAliasMapFromDisk() {
     const parsed = JSON.parse(raw)
     const shipToAliases = parsed?.ship_to_aliases ?? {}
     const aliasToShip = new Map()
+    const shipAliases = new Map()
 
     for (const [shipName, aliases] of Object.entries(shipToAliases)) {
-      aliasToShip.set(normalizeKeyword(shipName), shipName)
+      const normalizedShipName = normalizeKeyword(shipName)
+      if (!normalizedShipName) {
+        continue
+      }
+
+      aliasToShip.set(normalizedShipName, shipName)
+
+      const normalizedAliases = []
       for (const alias of Array.isArray(aliases) ? aliases : []) {
         const normalizedAlias = normalizeKeyword(alias)
         if (normalizedAlias) {
           aliasToShip.set(normalizedAlias, shipName)
+          normalizedAliases.push(normalizedAlias)
         }
       }
+
+      shipAliases.set(normalizedShipName, [...new Set(normalizedAliases)])
     }
 
-    return aliasToShip
+    return {
+      aliasToShip,
+      shipAliases
+    }
   } catch {
-    return new Map()
+    return {
+      aliasToShip: new Map(),
+      shipAliases: new Map()
+    }
   }
 }
 
 async function getAliasMap() {
-  aliasMapPromise ??= readAliasMapFromDisk()
+  aliasMapPromise ??= readAliasMapFromDisk().then((payload) => payload.aliasToShip)
   return aliasMapPromise
 }
 
-function scoreShip(ship, keyword) {
-  let best = 0
+async function getShipAliases() {
+  shipAliasesPromise ??= readAliasMapFromDisk().then((payload) => payload.shipAliases)
+  return shipAliasesPromise
+}
 
-  for (const token of ship.searchKeywords ?? []) {
-    if (!token) {
-      continue
-    }
-    if (token === keyword) {
-      best = Math.max(best, 100)
-      continue
-    }
-    if (token.startsWith(keyword)) {
-      best = Math.max(best, 75)
-      continue
-    }
-    if (token.includes(keyword)) {
-      best = Math.max(best, 55)
-      continue
-    }
-    if (keyword.startsWith(token) && token.length > 1) {
-      best = Math.max(best, 35)
-    }
-  }
+function scoreShip(ship, keyword, aliases = []) {
+  let best = 0
 
   const compactName = normalizeKeyword(ship.name)
   if (compactName === keyword) {
     best = Math.max(best, 110)
+  } else if (compactName.startsWith(keyword)) {
+    best = Math.max(best, 78)
+  } else if (compactName.includes(keyword)) {
+    best = Math.max(best, 60)
+  } else if (keyword.startsWith(compactName) && compactName.length > 2) {
+    best = Math.max(best, 36)
+  }
+
+  for (const alias of aliases) {
+    if (!alias) {
+      continue
+    }
+
+    if (alias === keyword) {
+      best = Math.max(best, 108)
+      continue
+    }
+
+    if (alias.startsWith(keyword)) {
+      best = Math.max(best, 76)
+      continue
+    }
+
+    if (alias.includes(keyword)) {
+      best = Math.max(best, 58)
+      continue
+    }
+
+    if (keyword.startsWith(alias) && alias.length > 2) {
+      best = Math.max(best, 34)
+    }
   }
 
   return best
@@ -195,13 +229,20 @@ export async function findShipFromCache(keyword) {
   }
 
   const aliasMap = await getAliasMap()
+  const shipAliases = await getShipAliases()
   const mappedShipName = aliasMap.get(query)
   if (mappedShipName) {
     query = normalizeKeyword(mappedShipName)
   }
 
   const ranked = cache.ships
-    .map((ship) => ({ ship, score: scoreShip(ship, query) }))
+    .map((ship) => {
+      const aliases = shipAliases.get(normalizeKeyword(ship.name)) ?? []
+      return {
+        ship,
+        score: scoreShip(ship, query, aliases)
+      }
+    })
     .filter((item) => item.score > 0)
     .sort((a, b) => {
       if (b.score !== a.score) {

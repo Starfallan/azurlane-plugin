@@ -154,12 +154,12 @@ export class AzurLaneWiki extends plugin {
   async dispatchWikiCommand(e, parsed) {
     e.azurlaneWiki = parsed
 
-    if (parsed.rawMode === '装备') {
+    if (parsed.rawMode === '装备' || parsed.rawMode === '属性') {
       const equipResult = await this.dispatchEquipAttributeCommand(e, parsed)
       if (equipResult !== null) {
         return equipResult
       }
-      // 装备名未命中时回退到舰船配装查询，兼容旧习惯。
+      // 装备名未命中时回退到舰船查询，兼容旧习惯。
     }
 
     try {
@@ -174,13 +174,6 @@ export class AzurLaneWiki extends plugin {
 
       return image
     } catch (error) {
-      if (error instanceof CacheLookupError && parsed.rawMode === '属性') {
-        const equipResult = await this.dispatchEquipAttributeCommand(e, parsed)
-        if (equipResult !== null) {
-          return equipResult
-        }
-      }
-
       if (error instanceof CacheLookupError) {
         return error.message
       }
