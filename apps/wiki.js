@@ -1,4 +1,5 @@
 import plugin from '../../../lib/plugins/plugin.js'
+import { createHash } from 'node:crypto'
 import fs from 'node:fs/promises'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
@@ -25,7 +26,10 @@ const MATCH_ALL_RULE = `^${COMMAND_HEAD}.*$`
 const COMMAND_TAIL = '[.。!！~～…]*$'
 const UPDATE_PLUGIN_RULE = new RegExp(`^${COMMAND_HEAD}插件更新${COMMAND_TAIL}`, 'i')
 const UPDATE_SHIP_DATA_RULE = new RegExp(`^${COMMAND_HEAD}更新(.+?)数据${COMMAND_TAIL}`, 'i')
+const PLUGIN_ROOT = fileURLToPath(new URL('..', import.meta.url))
+const SKIN_PNG_CACHE_DIR = path.join(PLUGIN_ROOT, 'temp', 'skin-png-cache')
 let initLogged = false
+let sharpLoaderPromise
 
 const MODE_ALIAS = {
   属性: 'attribute',
@@ -171,6 +175,55 @@ async function collectShipSkinFiles(ship, internalName) {
       }
       return a.fileName.localeCompare(b.fileName)
     })
+}
+
+async function getSharpInstance() {
+  sharpLoaderPromise ??= import('sharp')
+    .then((module) => module?.default ?? module)
+    .catch(() => null)
+
+  return sharpLoaderPromise
+}
+
+async function convertSkinImageForForward(sourcePath) {
+  const lowerPath = String(sourcePath ?? '').toLowerCase()
+  if (!lowerPath.endsWith('.avif')) {
+    return sourcePath
+  }
+
+  const sharp = await getSharpInstance()
+  if (!sharp) {
+    return sourcePath
+  }
+
+  try {
+    const stat = await fs.stat(sourcePath)
+    const digest = createHash('sha1')
+      .update(sourcePath)
+      .update(String(stat.size))
+      .update(String(stat.mtimeMs))
+      .digest('hex')
+      .slice(0, 20)
+
+    await fs.mkdir(SKIN_PNG_CACHE_DIR, { recursive: true })
+    const outputPath = path.join(SKIN_PNG_CACHE_DIR, `${digest}.png`)
+
+    try {
+      await fs.access(outputPath)
+      return outputPath
+    } catch {
+      // continue
+    }
+
+    await sharp(sourcePath, { failOn: 'none' })
+      .png({ compressionLevel: 9, adaptiveFiltering: true, quality: 100 })
+      .toFile(outputPath)
+
+    return outputPath
+  } catch (error) {
+    globalThis.logger?.warn?.('[azurlane-plugin] 皮肤转码 PNG 失败，已回退原图', error)
+    return sourcePath
+  }
 }
 
 function parseIncomingCommand(message) {
@@ -603,7 +656,8 @@ export class AzurLaneWiki extends plugin {
 
     const forwardImages = []
     for (const skin of selectedSkins) {
-      const fileUrl = `file://${skin.fullPath}`
+      const sendPath = await convertSkinImageForForward(skin.fullPath)
+      const fileUrl = `file://${sendPath}`
       forwardImages.push(globalThis.segment?.image?.(fileUrl) ?? fileUrl)
     }
 
