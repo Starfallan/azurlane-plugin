@@ -395,7 +395,7 @@ export class AzurLaneWiki extends plugin {
     } else if (command.type === 'admin-update-ship') {
       result = await this.updateShipData(e)
     } else if (command.type === 'ship-skin') {
-      result = await this.dispatchShipSkinCommand(command.parsed)
+      result = await this.dispatchShipSkinCommand(e, command.parsed)
     } else if (command.type === 'wiki') {
       result = await this.dispatchWikiCommand(e, command.parsed, command.source)
     }
@@ -568,7 +568,7 @@ export class AzurLaneWiki extends plugin {
     }
   }
 
-  async dispatchShipSkinCommand(parsed) {
+  async dispatchShipSkinCommand(e, parsed) {
     let ship
     try {
       const hit = await findShipFromCache(parsed.keyword)
