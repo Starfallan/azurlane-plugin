@@ -60,6 +60,37 @@ function parseEquipDirectCommand(message) {
   }
 }
 
+async function dispatchDirectKeyword(pluginInstance, e, parsed) {
+  const equipResult = await pluginInstance.dispatchEquipAttributeCommand(e, parsed)
+  if (equipResult !== null) {
+    return equipResult
+  }
+
+  try {
+    const { ship, alternatives, cacheMeta } = await findShipFromCache(parsed.keyword)
+    const image = await pluginInstance.renderWikiCard(e, {
+      ship,
+      mode: 'ship',
+      keyword: parsed.keyword,
+      alternatives,
+      cacheMeta
+    })
+
+    if (!image) {
+      return buildRenderFailureMessage('ship')
+    }
+
+    return image
+  } catch (error) {
+    if (error instanceof CacheLookupError) {
+      return `未找到“${parsed.keyword}”对应的装备或舰船。`
+    }
+
+    globalThis.logger?.error?.('[azurlane-plugin] 裸指令分流查询失败', error)
+    return '查询失败了，请检查本地缓存数据是否存在且格式正确。'
+  }
+}
+
 export class AzurLaneWiki extends plugin {
   constructor() {
     super({
@@ -111,10 +142,7 @@ export class AzurLaneWiki extends plugin {
     if (!parsed) {
       const equipDirectParsed = parseEquipDirectCommand(message)
       if (equipDirectParsed) {
-        const equipResult = await this.dispatchEquipAttributeCommand(e, equipDirectParsed)
-        if (equipResult !== null) {
-          return equipResult
-        }
+        return dispatchDirectKeyword(this, e, equipDirectParsed)
       }
 
       return false
