@@ -36,6 +36,30 @@ function parseShipUpdateCommand(message) {
   return String(match[1] ?? '').replace(/\s+/g, '').trim()
 }
 
+function parseEquipDirectCommand(message) {
+  const raw = String(message ?? '').trim()
+  if (!raw) {
+    return null
+  }
+
+  const match = raw.match(/^(?:(?:;|；)\s*(?:碧蓝|碧蓝航线|blhx)?|(?:碧蓝|碧蓝航线|blhx))\s*(.+?)[.。~～…]*$/i)
+  if (!match) {
+    return null
+  }
+
+  const keyword = String(match[1] ?? '').replace(/\s+/g, '').trim()
+  if (!keyword) {
+    return null
+  }
+
+  return {
+    command: raw,
+    keyword,
+    rawMode: '装备',
+    mode: 'equip'
+  }
+}
+
 export class AzurLaneWiki extends plugin {
   constructor() {
     super({
@@ -85,6 +109,14 @@ export class AzurLaneWiki extends plugin {
 
     const parsed = parseWikiCommand(message)
     if (!parsed) {
+      const equipDirectParsed = parseEquipDirectCommand(message)
+      if (equipDirectParsed) {
+        const equipResult = await this.dispatchEquipAttributeCommand(e, equipDirectParsed)
+        if (equipResult !== null) {
+          return equipResult
+        }
+      }
+
       return false
     }
 
@@ -114,6 +146,13 @@ export class AzurLaneWiki extends plugin {
 
       return image
     } catch (error) {
+      if (error instanceof CacheLookupError && parsed.rawMode === '属性') {
+        const equipResult = await this.dispatchEquipAttributeCommand(e, parsed)
+        if (equipResult !== null) {
+          return equipResult
+        }
+      }
+
       if (error instanceof CacheLookupError) {
         return error.message
       }

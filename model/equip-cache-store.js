@@ -1,8 +1,12 @@
 import path from 'node:path'
 import fs from 'node:fs/promises'
+import { fileURLToPath } from 'node:url'
 import { getEquipDataFile, loadEquipIndex, readEquipData } from './equip-store.js'
 
 let equipIndexPromise
+let equipAliasMapPromise
+
+const EQUIP_ALIAS_FILE = fileURLToPath(new URL('../resources/equip_aliases_from_nicknames.json', import.meta.url))
 
 export class EquipLookupError extends Error {
   constructor(message, reason = 'unknown') {
@@ -64,6 +68,38 @@ async function getEquipIndex() {
   return equipIndexPromise
 }
 
+async function readEquipAliasMapFromDisk() {
+  try {
+    const raw = await fs.readFile(EQUIP_ALIAS_FILE, 'utf8')
+    const parsed = JSON.parse(raw)
+    const equipToAliases = parsed?.equip_to_aliases ?? {}
+    const aliasToEquip = new Map()
+
+    for (const [fullName, aliases] of Object.entries(equipToAliases)) {
+      const normalizedFullName = normalizeKeyword(fullName)
+      if (normalizedFullName) {
+        aliasToEquip.set(normalizedFullName, fullName)
+      }
+
+      for (const alias of Array.isArray(aliases) ? aliases : []) {
+        const normalizedAlias = normalizeKeyword(alias)
+        if (normalizedAlias) {
+          aliasToEquip.set(normalizedAlias, fullName)
+        }
+      }
+    }
+
+    return aliasToEquip
+  } catch {
+    return new Map()
+  }
+}
+
+async function getEquipAliasMap() {
+  equipAliasMapPromise ??= readEquipAliasMapFromDisk()
+  return equipAliasMapPromise
+}
+
 function scoreEquip(entry, keyword) {
   let best = 0
   const fullName = normalizeKeyword(entry.full_name)
@@ -106,9 +142,15 @@ function formatAlternatives(items) {
 
 export async function findEquipFromCache(keyword) {
   const rawQuery = String(keyword ?? '').trim()
-  const query = normalizeKeyword(rawQuery)
+  let query = normalizeKeyword(rawQuery)
   if (!query) {
     throw new EquipLookupError('请输入要查询的装备名称。', 'invalid-query')
+  }
+
+  const aliasMap = await getEquipAliasMap()
+  const mappedFullName = aliasMap.get(query)
+  if (mappedFullName) {
+    query = normalizeKeyword(mappedFullName)
   }
 
   let equipIndex = []
