@@ -92,29 +92,35 @@ function parseShipSkinCommand(message) {
     return null
   }
 
-  const match = raw.match(/^(?:(?:;|；)\s*(?:碧蓝|碧蓝航线|blhx)?|(?:碧蓝航线|碧蓝))\s*(.+?)\s*皮肤(?:\s*(\d+))?[.。!！~～…]*$/i)
+  const match = raw.match(/^(?:(?:;|；)\s*(?:碧蓝|碧蓝航线|blhx)?|(?:碧蓝航线|碧蓝))\s*(.+?)\s*皮肤(?:\s*(\d+|婚))?[.。!！~～…]*$/i)
   if (!match) {
     return null
   }
 
   const keyword = String(match[1] ?? '').replace(/\s+/g, '').trim()
-  const rawSkinIndex = String(match[2] ?? '').trim()
+  const rawSuffix = String(match[2] ?? '').trim()
   if (!keyword) {
     return null
   }
 
   let skinIndex = null
-  if (rawSkinIndex) {
-    skinIndex = Number.parseInt(rawSkinIndex, 10)
-    if (!Number.isFinite(skinIndex) || skinIndex < 1) {
-      return null
+  let skinType = 'normal'
+  if (rawSuffix) {
+    if (rawSuffix === '婚') {
+      skinType = 'marriage'
+    } else {
+      skinIndex = Number.parseInt(rawSuffix, 10)
+      if (!Number.isFinite(skinIndex) || skinIndex < 1) {
+        return null
+      }
     }
   }
 
   return {
     command: raw,
     keyword,
-    skinIndex
+    skinIndex,
+    skinType
   }
 }
 
@@ -138,7 +144,7 @@ function buildShipSkinFileName(internalName, skinIndex) {
 }
 
 function getShipSkinSortIndex(fileName, internalName) {
-  const reg = new RegExp(`^${internalName.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}(?:_(\\d+))?_group\\.avif$`, 'i')
+  const reg = new RegExp(`^${internalName.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}(?:_(\\d+|h))?_group\\.avif$`, 'i')
   const match = fileName.match(reg)
   if (!match) {
     return Number.POSITIVE_INFINITY
@@ -146,6 +152,10 @@ function getShipSkinSortIndex(fileName, internalName) {
 
   if (!match[1]) {
     return 1
+  }
+
+  if (String(match[1]).toLowerCase() === 'h') {
+    return 999
   }
 
   const parsed = Number.parseInt(match[1], 10)
@@ -161,7 +171,7 @@ async function collectShipSkinFiles(ship, internalName) {
     return []
   }
 
-  const matcher = new RegExp(`^${internalName.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}(?:_\\d+)?_group\\.avif$`, 'i')
+  const matcher = new RegExp(`^${internalName.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}(?:_(?:\\d+|h))?_group\\.avif$`, 'i')
   return entries
     .filter((entry) => entry.isFile() && matcher.test(entry.name))
     .map((entry) => ({
@@ -652,7 +662,13 @@ export class AzurLaneWiki extends plugin {
     }
 
     let selectedSkins = allSkins
-    if (parsed.skinIndex !== null) {
+    if (parsed.skinType === 'marriage') {
+      const marriageFile = `${internalName}_h_group.avif`
+      selectedSkins = allSkins.filter((item) => item.fileName.toLowerCase() === marriageFile.toLowerCase())
+      if (!selectedSkins.length) {
+        return `未找到“${ship.name}”对应的婚纱立绘。`
+      }
+    } else if (parsed.skinIndex !== null) {
       const fileName = buildShipSkinFileName(internalName, parsed.skinIndex)
       selectedSkins = allSkins.filter((item) => item.fileName.toLowerCase() === fileName.toLowerCase())
       if (!selectedSkins.length) {
@@ -671,9 +687,11 @@ export class AzurLaneWiki extends plugin {
       return '皮肤图片读取失败，请检查文件是否损坏。'
     }
 
-    const title = parsed.skinIndex === null
-      ? `${ship.name}皮肤立绘`
-      : `${ship.name}皮肤${parsed.skinIndex}`
+    const title = parsed.skinType === 'marriage'
+      ? `${ship.name}婚纱立绘`
+      : (parsed.skinIndex === null
+          ? `${ship.name}皮肤立绘`
+          : `${ship.name}皮肤${parsed.skinIndex}`)
 
     try {
       return await common.makeForwardMsg(e, forwardImages, title)
