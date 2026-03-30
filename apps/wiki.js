@@ -180,7 +180,10 @@ async function collectShipSkinFiles(ship, internalName) {
 async function getSharpInstance() {
   sharpLoaderPromise ??= import('sharp')
     .then((module) => module?.default ?? module)
-    .catch(() => null)
+    .catch((error) => {
+      globalThis.logger?.warn?.('[azurlane-plugin] 未能加载 sharp，皮肤图将回退原图发送', error)
+      return null
+    })
 
   return sharpLoaderPromise
 }
@@ -193,6 +196,7 @@ async function convertSkinImageForForward(sourcePath) {
 
   const sharp = await getSharpInstance()
   if (!sharp) {
+    globalThis.logger?.warn?.('[azurlane-plugin] sharp 不可用，皮肤图仍使用原始 AVIF 路径发送')
     return sourcePath
   }
 
@@ -210,6 +214,7 @@ async function convertSkinImageForForward(sourcePath) {
 
     try {
       await fs.access(outputPath)
+      globalThis.logger?.debug?.(`[azurlane-plugin] 皮肤图命中 PNG 转码缓存: ${outputPath}`)
       return outputPath
     } catch {
       // continue
@@ -219,6 +224,7 @@ async function convertSkinImageForForward(sourcePath) {
       .png({ compressionLevel: 9, adaptiveFiltering: true, quality: 100 })
       .toFile(outputPath)
 
+    globalThis.logger?.debug?.(`[azurlane-plugin] 皮肤图转码 PNG 成功: ${sourcePath} -> ${outputPath}`)
     return outputPath
   } catch (error) {
     globalThis.logger?.warn?.('[azurlane-plugin] 皮肤转码 PNG 失败，已回退原图', error)
@@ -656,8 +662,8 @@ export class AzurLaneWiki extends plugin {
 
     const forwardImages = []
     for (const skin of selectedSkins) {
-      // const sendPath = await convertSkinImageForForward(skin.fullPath)
-      const sendPath = skin.fullPath
+      const sendPath = await convertSkinImageForForward(skin.fullPath)
+      globalThis.logger?.debug?.(`[azurlane-plugin] 皮肤发送路径: ${sendPath}`)
       forwardImages.push(globalThis.segment?.image?.(sendPath) ?? sendPath)
     }
 
