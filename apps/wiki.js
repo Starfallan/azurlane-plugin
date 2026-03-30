@@ -656,9 +656,9 @@ export class AzurLaneWiki extends plugin {
 
     const forwardImages = []
     for (const skin of selectedSkins) {
-      const sendPath = await convertSkinImageForForward(skin.fullPath)
-      const fileUrl = `file://${sendPath}`
-      forwardImages.push(globalThis.segment?.image?.(fileUrl) ?? fileUrl)
+      // const sendPath = await convertSkinImageForForward(skin.fullPath)
+      const sendPath = skin.fullPath
+      forwardImages.push(globalThis.segment?.image?.(sendPath) ?? sendPath)
     }
 
     if (!forwardImages.length) {

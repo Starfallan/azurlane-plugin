@@ -244,6 +244,9 @@ function rememberFallbackRender(saveId, image) {
 }
 
 function wrapRenderedImage(image) {
+  if (image === true || image === false) {
+    return image
+  }
   return globalThis.segment?.image?.(image) ?? image
 }
 
@@ -368,6 +371,9 @@ async function renderByTemplate(e, rendererKey, data) {
   }
 
   const runtimeRendered = await renderByRuntime(e, rendererKey, data)
+  if (runtimeRendered === true) {
+    return true
+  }
   if (runtimeRendered !== null && runtimeRendered !== false) {
     const cachedFile = await persistRenderedImage(data.saveId, runtimeRendered)
     if (cachedFile) {
@@ -379,6 +385,9 @@ async function renderByTemplate(e, rendererKey, data) {
   }
 
   const rendered = await renderByRenderer(rendererKey, data)
+  if (rendered === true) {
+    return true
+  }
   if (rendered !== null && rendered !== false) {
     const cachedFile = await persistRenderedImage(data.saveId, rendered)
     if (cachedFile) {
