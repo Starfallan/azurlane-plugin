@@ -13,6 +13,7 @@
     "build:equip": "node ./tools/build-equip-cache.js",
     "build:equip:html": "node ./tools/build-equip-from-html.js",
     "build:equip:all": "python ./tools/build-all-equips.py",
+    "build:ship:aliases": "python ./tools/augment-ship-aliases.py",
     "build:equip:aliases": "python ./tools/parse-equip-aliases.py",
     "preview": "node ./tools/preview-ship-card.js",
     "preview:equip": "node ./tools/preview-ship-equip-card.js",
