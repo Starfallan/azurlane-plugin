@@ -135,30 +135,31 @@ function inferShipInternalName(ship) {
   return match?.[1] ? String(match[1]) : ''
 }
 
-function buildShipSkinFileName(internalName, skinIndex) {
+function buildShipSkinFileName(internalName, skinIndex, variant = '') {
+  const variantSuffix = variant ? `_${variant}` : ''
   if (skinIndex <= 1) {
-    return `${internalName}_group.avif`
+    return `${internalName}${variantSuffix}_group.avif`
   }
 
-  return `${internalName}_${skinIndex}_group.avif`
+  return `${internalName}${variantSuffix}_${skinIndex}_group.avif`
 }
 
 function getShipSkinSortIndex(fileName, internalName) {
-  const reg = new RegExp(`^${internalName.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}(?:_(\\d+|h))?_group\\.avif$`, 'i')
+  const reg = new RegExp(`^${internalName.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}(?:_(doa))?(?:_(\\d+|h))?_group\\.avif$`, 'i')
   const match = fileName.match(reg)
   if (!match) {
     return Number.POSITIVE_INFINITY
   }
 
-  if (!match[1]) {
+  if (!match[2]) {
     return 1
   }
 
-  if (String(match[1]).toLowerCase() === 'h') {
+  if (String(match[2]).toLowerCase() === 'h') {
     return 999
   }
 
-  const parsed = Number.parseInt(match[1], 10)
+  const parsed = Number.parseInt(match[2], 10)
   return Number.isFinite(parsed) ? parsed : Number.POSITIVE_INFINITY
 }
 
@@ -171,7 +172,7 @@ async function collectShipSkinFiles(ship, internalName) {
     return []
   }
 
-  const matcher = new RegExp(`^${internalName.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}(?:_(?:\\d+|h))?_group\\.avif$`, 'i')
+  const matcher = new RegExp(`^${internalName.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}(?:_(?:doa))?(?:_(?:\\d+|h))?_group\\.avif$`, 'i')
   return entries
     .filter((entry) => entry.isFile() && matcher.test(entry.name))
     .map((entry) => ({
@@ -663,14 +664,22 @@ export class AzurLaneWiki extends plugin {
 
     let selectedSkins = allSkins
     if (parsed.skinType === 'marriage') {
-      const marriageFile = `${internalName}_h_group.avif`
-      selectedSkins = allSkins.filter((item) => item.fileName.toLowerCase() === marriageFile.toLowerCase())
+      const marriageFiles = [
+        `${internalName}_h_group.avif`,
+        `${internalName}_doa_h_group.avif`
+      ]
+      const marriageSet = new Set(marriageFiles.map((name) => name.toLowerCase()))
+      selectedSkins = allSkins.filter((item) => marriageSet.has(item.fileName.toLowerCase()))
       if (!selectedSkins.length) {
         return `未找到“${ship.name}”对应的婚纱立绘。`
       }
     } else if (parsed.skinIndex !== null) {
-      const fileName = buildShipSkinFileName(internalName, parsed.skinIndex)
-      selectedSkins = allSkins.filter((item) => item.fileName.toLowerCase() === fileName.toLowerCase())
+      const skinFiles = [
+        buildShipSkinFileName(internalName, parsed.skinIndex),
+        buildShipSkinFileName(internalName, parsed.skinIndex, 'doa')
+      ]
+      const skinSet = new Set(skinFiles.map((name) => name.toLowerCase()))
+      selectedSkins = allSkins.filter((item) => skinSet.has(item.fileName.toLowerCase()))
       if (!selectedSkins.length) {
         return `未找到“${ship.name}”对应的皮肤立绘（皮肤${parsed.skinIndex}）。`
       }

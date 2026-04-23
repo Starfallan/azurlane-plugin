@@ -20,6 +20,8 @@ export function normalizeKeyword(value) {
   return String(value ?? '')
     .trim()
     .toLowerCase()
+    // 统一常见异体字，避免输入法字形差异导致查询未命中。
+    .replace(/倶/g, '俱')
     .replace(/[·・･‧]/g, '')
     .replace(/[()（）[\]【】]/g, '')
     .replace(/[_./\\\-\s]+/g, '')
