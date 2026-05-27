@@ -1,7 +1,8 @@
 node_modules
 docs
 .github
-resources/character/*
-resources/equip/*
+__pycache__/
+resources/
 temp/
-resources/common/
+tools/build_ship_data/
+tools/build_equip_data/
