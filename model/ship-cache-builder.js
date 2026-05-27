@@ -67,7 +67,7 @@ function sleep(ms) {
 
 function transformShipData(parsed, entry) {
   const wikiImage = parsed.image || ''
-  const shipName = parsed.pageTitle || entry.original_name || parsed.name || ''
+  const shipName = entry.original_name || parsed.pageTitle || parsed.name || ''
   const localImage = getExpectedShipLocalImagePath(shipName, entry.matched_internal_name)
 
   return {

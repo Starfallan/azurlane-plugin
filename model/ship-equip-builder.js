@@ -52,7 +52,7 @@ async function enrichEquipRef(ref) {
 }
 
 async function enrichShipEquipData(parsed, entry) {
-  const shipName = parsed.page_title || entry.original_name || ''
+  const shipName = entry.original_name || parsed.page_title || ''
   const special = []
   for (const item of parsed.special_recommendations ?? []) {
     special.push(item)

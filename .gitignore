@@ -6,3 +6,4 @@ resources/
 temp/
 tools/build_ship_data/
 tools/build_equip_data/
+tools/__pycache__/
