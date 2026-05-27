@@ -21,7 +21,7 @@ import {
   parseWikiCommand
 } from '../model/wiki-command.js'
 
-const COMMAND_HEAD = '(?:(?:;|；)\\s*(?:碧蓝|碧蓝航线|blhx)?|(?:碧蓝航线|碧蓝))\\s*'
+const COMMAND_HEAD = '(?:;|；)\\s*(?:碧蓝|碧蓝航线|blhx)?\\s*'
 const MATCH_ALL_RULE = `^${COMMAND_HEAD}.*$`
 const COMMAND_TAIL = '[.。!！~～…]*$'
 const UPDATE_PLUGIN_RULE = new RegExp(`^${COMMAND_HEAD}插件更新${COMMAND_TAIL}`, 'i')
@@ -54,7 +54,7 @@ function isUpdatePluginCommand(message) {
 }
 
 function parseShipUpdateCommand(message) {
-  const match = String(message ?? '').trim().match(/^(?:(?:;|；)\s*(?:碧蓝|碧蓝航线|blhx)?|(?:碧蓝航线|碧蓝))\s*更新(.+?)数据[.。~～…]*$/i)
+  const match = String(message ?? '').trim().match(/^(?:;|；)\s*(?:碧蓝|碧蓝航线|blhx)?\s*更新(.+?)数据[.。~～…]*$/i)
   if (!match) {
     return ''
   }
@@ -68,7 +68,7 @@ function parseEquipDirectCommand(message) {
     return null
   }
 
-  const match = raw.match(/^(?:(?:;|；)\s*(?:碧蓝|碧蓝航线|blhx)?|(?:碧蓝航线|碧蓝))\s*(.+?)[.。~～…]*$/i)
+  const match = raw.match(/^(?:;|；)\s*(?:碧蓝|碧蓝航线|blhx)?\s*(.+?)[.。~～…]*$/i)
   if (!match) {
     return null
   }
@@ -92,7 +92,7 @@ function parseShipSkinCommand(message) {
     return null
   }
 
-  const match = raw.match(/^(?:(?:;|；)\s*(?:碧蓝|碧蓝航线|blhx)?|(?:碧蓝航线|碧蓝))\s*(.+?)\s*皮肤(?:\s*(\d+|婚))?[.。!！~～…]*$/i)
+  const match = raw.match(/^(?:;|；)\s*(?:碧蓝|碧蓝航线|blhx)?\s*(.+?)\s*皮肤(?:\s*(\d+|婚))?[.。!！~～…]*$/i)
   if (!match) {
     return null
   }
@@ -431,7 +431,7 @@ export class AzurLaneWiki extends plugin {
 
     if (!initLogged) {
       initLogged = true
-      const message = '[azurlane-plugin] 碧蓝航线 Wiki 插件初始化成功，已启用命令：;xxx / 碧蓝xxx'
+      const message = '[azurlane-plugin] 碧蓝航线 Wiki 插件初始化成功，已启用命令：;xxx'
       globalThis.logger?.info?.(message)
       if (!globalThis.logger?.info) {
         console.info(message)
